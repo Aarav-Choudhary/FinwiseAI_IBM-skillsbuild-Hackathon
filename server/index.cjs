@@ -268,6 +268,38 @@ Format: {"explanation": "...", "example": "..."}`;
 });
 
 /* ─────────────────────────────────────────────────────────── */
+/*  GET / (Root API info page)                                 */
+/* ─────────────────────────────────────────────────────────── */
+app.get("/", (_req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>FinWise AI Backend API</title>
+        <style>
+          body { background: #0B0B0D; color: #ECE7DD; font-family: sans-serif; padding: 40px; }
+          a { color: #6C63FF; text-decoration: none; }
+          .badge { background: #17171A; border: 1px solid #2A2A2E; padding: 4px 12px; border-radius: 20px; color: #00D9A3; }
+          code { background: #17171A; padding: 2px 6px; border-radius: 4px; color: #6C63FF; }
+        </style>
+      </head>
+      <body>
+        <h1>🚀 FinWise AI Backend API Server</h1>
+        <p><span class="badge">Status: Running on Port 3001</span></p>
+        <p>This is the Express backend API for FinWise AI.</p>
+        <h3>Available API Endpoints:</h3>
+        <ul>
+          <li><code>GET /api/health</code> — <a href="/api/health">Check Health JSON</a></li>
+          <li><code>POST /api/finbot</code> — IBM watsonx Granite Chat</li>
+          <li><code>POST /api/health-score</code> — AI Financial Health Score (0-100)</li>
+        </ul>
+        <p>👉 To access the full UI web application, open <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+      </body>
+    </html>
+  `);
+});
+
+/* ─────────────────────────────────────────────────────────── */
 /*  GET /api/health                                            */
 /* ─────────────────────────────────────────────────────────── */
 app.get("/api/health", (_req, res) => {
@@ -277,6 +309,7 @@ app.get("/api/health", (_req, res) => {
     ibm_configured: !!(WATSONX_API_KEY && WATSONX_PROJECT_ID),
   });
 });
+
 
 /* ─────────────────────────────────────────────────────────── */
 /*  Startup                                                    */
