@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.cjs",
-    "start": "concurrently \"npm run dev\" \"npm run server\""
+    "dev:full": "concurrently \"npm run dev\" \"npm run server\"",
+    "serve": "npm run build && node server/index.cjs",
+    "start": "node server/index.cjs"
   },
   "dependencies": {
     "concurrently": "^10.0.5",
@@ -20,6 +22,7 @@
     "lucide-react": "^0.441.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.2",
     "recharts": "^2.12.7"
   },

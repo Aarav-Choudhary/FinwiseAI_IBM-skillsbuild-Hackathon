@@ -74,7 +74,11 @@ export default function OnboardingPage({ user, setProfile }) {
     };
 
     if (user?.uid) {
-      await saveProfile(user.uid, profileData);
+      // Race against a 3-second timeout so a hanging Firestore write
+      // (e.g. placeholder Firebase credentials that never reject) never
+      // blocks navigation to the dashboard.
+      const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
+      await Promise.race([saveProfile(user.uid, profileData), timeout]);
     }
     setProfile(profileData);
     navigate("/dashboard");

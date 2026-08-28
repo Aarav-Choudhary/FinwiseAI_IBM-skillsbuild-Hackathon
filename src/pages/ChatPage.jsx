@@ -90,7 +90,7 @@ Student Context: Income: ${currencySymbol}${profile?.income || 0}, Course: ${pro
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col md:flex-row overflow-hidden">
       {/* ── Left Chat Panel ──────────────────────────────── */}
-      <div className="flex-1 flex flex-col h-full border-r border-border bg-bg">
+      <div className="flex-1 min-w-0 flex flex-col h-full border-r border-border bg-bg">
         {/* Chat Messages List */}
         <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4">
           {messages.map((msg, index) => (
@@ -144,7 +144,7 @@ Student Context: Income: ${currencySymbol}${profile?.income || 0}, Course: ${pro
       </div>
 
       {/* ── Right Dynamic Context Panel ──────────────────── */}
-      <div className="w-full md:w-80 lg:w-96 p-4 md:p-6 bg-surface border-t md:border-t-0 border-border overflow-y-auto space-y-6 hidden lg:block">
+      <div className="w-72 p-4 md:p-5 bg-surface border-t md:border-t-0 border-border overflow-y-auto space-y-6 hidden md:block flex-shrink-0">
         <div>
           <h3 className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">Student Context</h3>
           <div className="glass p-4 rounded-xl space-y-2 text-xs">

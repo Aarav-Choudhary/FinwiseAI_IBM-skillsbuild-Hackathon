@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, MessageSquare, Receipt, Building2,
   GraduationCap, PiggyBank, LogOut, Menu, X, Sparkles,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { logOut } from "../lib/firebase";
 
@@ -31,22 +32,25 @@ export default function Sidebar({ user, profile }) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* ── Logo ─────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "linear-gradient(135deg, #6C63FF, #00D9A3)" }}>
-          <Sparkles size={18} className="text-white" />
-        </div>
+      <div className={`flex items-center ${collapsed ? "justify-center py-5" : "gap-3 px-4 py-5"} border-b border-border`}>
         {!collapsed && (
-          <div>
-            <span className="font-bold text-base gradient-text">FinWise AI</span>
-            <p className="text-[10px] text-textSecondary leading-tight">Money mentor</p>
-          </div>
+          <>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #6C63FF, #00D9A3)" }}>
+              <Sparkles size={18} className="text-white" />
+            </div>
+            <div>
+              <span className="font-bold text-base gradient-text">FinWise AI</span>
+              <p className="text-[10px] text-textSecondary leading-tight">Money mentor</p>
+            </div>
+          </>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto p-1.5 rounded-lg hover:bg-surface text-textSecondary hover:text-textPrimary transition-colors hidden md:block"
+          className={`${collapsed ? "" : "ml-auto"} p-1.5 rounded-lg hover:bg-surface text-textSecondary hover:text-textPrimary transition-colors hidden md:block flex-shrink-0`}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <Menu size={16} />
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
 

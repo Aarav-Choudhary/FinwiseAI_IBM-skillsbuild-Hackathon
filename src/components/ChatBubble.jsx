@@ -1,4 +1,5 @@
 import { Sparkles, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export default function ChatBubble({ message }) {
   const isUser = message.role === "user";
@@ -23,7 +24,13 @@ export default function ChatBubble({ message }) {
               : "chat-bubble-bot glass"
           }`}
         >
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <div className="prose-chat">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 px-1 text-[10px] text-textSecondary">

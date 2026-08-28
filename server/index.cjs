@@ -31,6 +31,19 @@ app.use((req, res, next) => {
 });
 
 /* ─────────────────────────────────────────────────────────── */
+/*  Serve built frontend from /dist                            */
+/*  This makes `node server/index.cjs` serve BOTH the React   */
+/*  app AND the /api endpoints from the same port (3001).     */
+/*  API routes below take priority over static files.         */
+/* ─────────────────────────────────────────────────────────── */
+const DIST_DIR = path.join(__dirname, "../dist");
+const distExists = fs.existsSync(DIST_DIR);
+if (distExists) {
+  app.use(express.static(DIST_DIR));
+  console.log(`📁 Serving static frontend from ${DIST_DIR}`);
+}
+
+/* ─────────────────────────────────────────────────────────── */
 /*  IBM watsonx.ai helper                                      */
 /* ─────────────────────────────────────────────────────────── */
 const WATSONX_URL        = process.env.WATSONX_URL        || "https://us-south.ml.cloud.ibm.com";
@@ -117,6 +130,50 @@ async function callGranite(systemPrompt, userMessage, maxTokens = 800) {
   });
 }
 
+async function callGroq(systemPrompt, userMessage, maxTokens = 800) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  const payload = JSON.stringify({
+    model: "openai/gpt-oss-120b",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage }
+    ],
+    max_tokens: maxTokens
+  });
+
+  return new Promise((resolve) => {
+    const options = {
+      hostname: "api.groq.com",
+      path: "/openai/v1/chat/completions",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Length": Buffer.byteLength(payload)
+      }
+    };
+    const req = https.request(options, (res) => {
+      let raw = "";
+      res.on("data", c => raw += c);
+      res.on("end", () => {
+        try {
+          const json = JSON.parse(raw);
+          const text = json.choices?.[0]?.message?.content?.trim() || null;
+          resolve(text);
+        } catch { resolve(null); }
+      });
+    });
+    req.on("error", () => resolve(null));
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function getGroundedExplanation(systemPrompt, userMessage, maxTokens = 800) {
+  return await callGroq(systemPrompt, userMessage, maxTokens);
+}
+
 /* ─────────────────────────────────────────────────────────── */
 /*  POST /api/finbot                                           */
 /*  Main FinBot chat endpoint — IBM Granite with student ctx  */
@@ -148,15 +205,15 @@ Keep responses under 200 words.`;
   }
 
   try {
-    const ibmResponse = await callGranite(contextPrompt, message, 600);
+    const groqResponse = await callGroq(contextPrompt, message, 600);
 
-    if (ibmResponse) {
-      return res.json({ reply: ibmResponse, model: "ibm/granite-13b-chat-v2", _real: true });
+    if (groqResponse) {
+      return res.json({ reply: groqResponse, model: "openai/gpt-oss-120b", _real: true });
     }
 
     // Fallback stub
     const stub = FINBOT_STUB_RESPONSES[Math.floor(Math.random() * FINBOT_STUB_RESPONSES.length)];
-    res.json({ reply: stub, model: "ibm/granite-13b-chat-v2 (demo)", _stub: true });
+    res.json({ reply: stub, model: "demo", _stub: true });
   } catch (err) {
     const stub = FINBOT_STUB_RESPONSES[0];
     res.json({ reply: stub, model: "demo", _stub: true });
@@ -197,11 +254,11 @@ Goals: ${(profile?.goals || []).join(", ") || "Not set"}
 Calculate financial health score and give 3 specific tips.`;
 
   try {
-    const ibmResponse = await callGranite(systemPrompt, userMessage, 300);
+    const groqResponse = await callGroq(systemPrompt, userMessage, 300);
 
-    if (ibmResponse) {
+    if (groqResponse) {
       // Extract JSON from response
-      const jsonMatch = ibmResponse.match(/\{[\s\S]*\}/);
+      const jsonMatch = groqResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const data = JSON.parse(jsonMatch[0]);
         return res.json({ ...data, _real: true });
@@ -246,22 +303,22 @@ Format: {"explanation": "...", "example": "..."}`;
 
   const userMessage = `Explain this financial rule for a student: ${ruleCode.replace(/_/g, " ")}`;
 
-  const ibmResponse = await callGranite(systemPrompt, userMessage, 300);
+  const ibmResponse = await getGroundedExplanation(systemPrompt, userMessage, 300);
   if (ibmResponse) {
     const jsonMatch = ibmResponse.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         const data = JSON.parse(jsonMatch[0]);
-        return res.json({ ...data, model: "ibm/granite-13b-chat-v2", ruleCode, _real: true });
+        return res.json({ ...data, model: "openai/gpt-oss-120b", ruleCode, _real: true });
       } catch (_) {}
     }
-    return res.json({ explanation: ibmResponse, example: null, model: "ibm/granite-13b-chat-v2", ruleCode, _real: true });
+    return res.json({ explanation: ibmResponse, example: null, model: "openai/gpt-oss-120b", ruleCode, _real: true });
   }
 
   res.json({
     explanation: "This financial pattern warrants attention. Review your budget and spending habits relative to your income.",
     example: null,
-    model: "ibm/granite-13b-chat-v2 (demo)",
+    model: "demo",
     ruleCode,
     _stub: true,
   });
@@ -310,6 +367,19 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+
+/* ─────────────────────────────────────────────────────────── */
+/*  SPA Catch-all (must be LAST, after all /api routes)       */
+/*  Serves index.html for React Router (client-side routing)  */
+/* ─────────────────────────────────────────────────────────── */
+if (distExists) {
+  app.get("*", (req, res) => {
+    // Only serve index.html for non-API, non-asset requests
+    if (!req.path.startsWith("/api")) {
+      res.sendFile(path.join(DIST_DIR, "index.html"));
+    }
+  });
+}
 
 /* ─────────────────────────────────────────────────────────── */
 /*  Startup                                                    */

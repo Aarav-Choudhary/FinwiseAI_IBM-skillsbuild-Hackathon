@@ -187,7 +187,14 @@ export default function ExpensesPage({ profile, expenses = [], setExpenses }) {
                   </Pie>
                   <Tooltip
                     formatter={(value) => formatCurrency(value, countryCode)}
-                    contentStyle={{ backgroundColor: "#17171A", borderColor: "#2A2A2E", borderRadius: "8px" }}
+                    contentStyle={{
+                      backgroundColor: "#17171A",
+                      borderColor: "#2A2A2E",
+                      borderRadius: "8px",
+                      color: "#ECE7DD",
+                    }}
+                    labelStyle={{ color: "#9B968C", fontWeight: 600 }}
+                    itemStyle={{ color: "#ECE7DD" }}
                   />
                 </PieChart>
               </ResponsiveContainer>
