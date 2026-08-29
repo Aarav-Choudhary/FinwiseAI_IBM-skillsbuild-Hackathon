@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Sparkles, PieChart, GraduationCap, Building2, HelpCircle } from "lucide-react";
 import ChatBubble from "../components/ChatBubble";
 import { formatCurrency, getScholarshipsForCountry, getLoansForCountry } from "../lib/countries";
+import { getChatHistory, saveMessage } from "../lib/firebase";
 
 const SUGGESTED_PROMPTS = [
   "Can I afford a new laptop?",
@@ -12,30 +13,89 @@ const SUGGESTED_PROMPTS = [
   "What is my current financial health score?",
 ];
 
-export default function ChatPage({ profile, expenses = [], budget }) {
+function generateClientFallback(query, profile, expenses = [], budget) {
+  const msg = (query || "").toLowerCase();
+  const symbol = profile?.countryData?.symbol || "₹";
+  const income = profile?.income || 15000;
+  const country = profile?.countryData?.name || "your country";
+  const course = profile?.course || "your course";
+  const totalSpent = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  if (msg.includes("laptop") || msg.includes("afford") || msg.includes("buy")) {
+    const recommended = Math.round(income * 2.5);
+    return `Based on your monthly income of ${symbol}${income.toLocaleString()}, buying a student laptop around ${symbol}${recommended.toLocaleString()} to ${symbol}${(recommended * 1.5).toLocaleString()} is feasible if you save 20% (${symbol}${Math.round(income * 0.2).toLocaleString()}/month) for 6–8 months or check student developer discounts.`;
+  }
+
+  if (msg.includes("overspending") || msg.includes("spending") || msg.includes("expenses")) {
+    const topExpense = [...expenses].sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+    if (topExpense) {
+      return `You have spent ${symbol}${totalSpent.toLocaleString()} so far. Your highest expense category is **${topExpense.category}** (${symbol}${topExpense.amount.toLocaleString()}). Try capping discretionary outings to save 15–20% more each month.`;
+    }
+    return `Your recorded expenses total ${symbol}${totalSpent.toLocaleString()} against an income of ${symbol}${income.toLocaleString()}. Following the 50/30/20 rule, keep non-essential 'Wants' under ${symbol}${Math.round(income * 0.3).toLocaleString()}.`;
+  }
+
+  if (msg.includes("loan") || msg.includes("interest") || msg.includes("debt")) {
+    return `For students studying ${course} in ${country}, government education loan schemes provide subsidized interest rates during study moratoriums. Aim to keep future monthly repayments under 20% of your projected entry salary.`;
+  }
+
+  if (msg.includes("scholarship") || msg.includes("grant")) {
+    return `Top scholarship opportunities in ${country} prioritize merit, STEM/humanities majors, and need-based applicants. Applying 2–3 months prior to semester deadlines increases acceptance rates significantly.`;
+  }
+
+  if (msg.includes("emergency") || msg.includes("save")) {
+    const target = Math.round(income * 2.5);
+    return `Target an emergency cushion of 2 to 3 months of basic expenses (~${symbol}${target.toLocaleString()}). Setting aside ${symbol}${Math.round(income * 0.15).toLocaleString()} monthly into a dedicated savings account will build this safely before graduation.`;
+  }
+
+  if (msg.includes("score") || msg.includes("health")) {
+    const score = Math.min(95, Math.max(50, Math.round(((income - totalSpent) / (income || 1)) * 50 + 40)));
+    return `Your calculated Financial Health Score is around **${score}/100**. Maintaining your essential spending below 50% and keeping an active savings rate will raise your score towards Grade A.`;
+  }
+
+  return `Based on your profile as a ${course} student in ${country} with a monthly income of ${symbol}${income.toLocaleString()}, I recommend keeping essentials under ${symbol}${Math.round(income * 0.5).toLocaleString()} (50%) and building your emergency buffer. What specific area (budget, loans, or scholarships) would you like help with?`;
+}
+
+export default function ChatPage({ user, profile, expenses = [], budget }) {
   const countryCode = profile?.country || "IN";
   const currencySymbol = profile?.countryData?.symbol || "₹";
+  const activeUid = user?.uid || "guest_user";
 
-  const [messages, setMessages] = useState([
-    {
-      role: "bot",
-      content: `Hello ${profile?.name || "there"}! I'm FinBot, your IBM watsonx AI financial mentor. I can analyze your spending in ${profile?.countryData?.name || "your region"}, suggest budgets, explain student loans, or match scholarships. What would you like to explore today?`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      model: "ibm/granite-13b-chat-v2",
-    },
-  ]);
+  const defaultGreeting = {
+    role: "bot",
+    content: `Hello ${profile?.name || "there"}! I'm FinBot, your IBM watsonx AI financial mentor. I can analyze your spending in ${profile?.countryData?.name || "your region"}, suggest budgets, explain student loans, or match scholarships. What would you like to explore today?`,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    model: "ibm/granite-13b-chat-v2",
+  };
+
+  const [messages, setMessages] = useState([defaultGreeting]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
+    async function loadHistory() {
+      try {
+        const history = await getChatHistory(activeUid);
+        if (history && history.length > 0) {
+          setMessages(history);
+        } else {
+          setMessages([defaultGreeting]);
+        }
+      } catch (err) {
+        console.warn("Could not load chat history:", err);
+      }
+    }
+    loadHistory();
+  }, [activeUid]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async (textToSend) => {
-    const queryText = textToSend || input;
-    if (!queryText.trim() || loading) return;
+    const queryText = (typeof textToSend === "string" ? textToSend : input).trim();
+    if (!queryText || loading) return;
 
     const userMsg = {
       role: "user",
@@ -44,8 +104,12 @@ export default function ChatPage({ profile, expenses = [], budget }) {
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    if (!textToSend) setInput("");
+    setInput("");
     setLoading(true);
+
+    try {
+      await saveMessage(activeUid, userMsg);
+    } catch (_) {}
 
     const systemPrompt = `You are FinBot, a friendly, expert financial advisor for college students in ${profile?.countryData?.name || "India"}. 
 Always reference amounts in ${currencySymbol} (${profile?.currency || "INR"}). 
@@ -60,25 +124,34 @@ Student Context: Income: ${currencySymbol}${profile?.income || 0}, Course: ${pro
           message: queryText,
           systemPrompt,
           history: messages,
+          studentContext: {
+            currencySymbol,
+            income: profile?.income || 15000,
+            countryName: profile?.countryData?.name || "India",
+            course: profile?.course || "Student",
+          },
         }),
       });
 
       const data = await res.json();
       const botMsg = {
         role: "bot",
-        content: data.reply || "I'm sorry, I couldn't generate a response right now. Please try again.",
+        content: data.reply || generateClientFallback(queryText, profile, expenses, budget),
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         model: data.model || "ibm/granite-13b-chat-v2",
       };
       setMessages((prev) => [...prev, botMsg]);
+      await saveMessage(activeUid, botMsg);
     } catch {
+      const fallbackReply = generateClientFallback(queryText, profile, expenses, budget);
       const fallbackMsg = {
         role: "bot",
-        content: `Based on your profile in ${profile?.countryData?.name || "your country"}, I recommend focusing on keeping essential costs below 50% of your ${currencySymbol}${profile?.income || 0} budget. Ask me specifically about expenses, loans, or scholarships!`,
+        content: fallbackReply,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: "ibm/granite-13b-chat-v2 (offline)",
+        model: "ibm/granite-13b-chat-v2 (offline/demo)",
       };
       setMessages((prev) => [...prev, fallbackMsg]);
+      await saveMessage(activeUid, fallbackMsg);
     } finally {
       setLoading(false);
     }
@@ -99,7 +172,7 @@ Student Context: Income: ${currencySymbol}${profile?.income || 0}, Course: ${pro
           {loading && (
             <div className="flex items-center gap-2 text-xs text-textSecondary p-2">
               <Sparkles size={14} className="animate-spin text-primary" />
-              <span>FinBot is thinking with IBM watsonx...</span>
+              <span>FinBot is analyzing your request...</span>
             </div>
           )}
           <div ref={messagesEndRef} />

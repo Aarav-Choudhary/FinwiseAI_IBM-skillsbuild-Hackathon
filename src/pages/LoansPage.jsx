@@ -40,12 +40,18 @@ export default function LoansPage({ profile }) {
         body: JSON.stringify({
           message: `Assess student loan affordability: Loan amount ${formatCurrency(principal, countryCode)}, interest rate ${rate}%, tenure ${tenureMonths} months. Calculated monthly EMI is ${formatCurrency(emi, countryCode)}. Student's monthly income is ${formatCurrency(profile?.income || 0, countryCode)}. Is this EMI manageable after graduation?`,
           systemPrompt: "You are a student loan risk advisor. Give a 2-sentence clear assessment.",
+          studentContext: {
+            currencySymbol: profile?.countryData?.symbol || "₹",
+            income: profile?.income || 15000,
+            countryName: profile?.countryData?.name || "India",
+          },
         }),
       });
+      if (!res.ok) throw new Error("Loan assessment API unavailable");
       const data = await res.json();
-      setAiAssessment(data.reply || "Loan is manageable if EMI stays below 20% of your projected starting salary.");
+      setAiAssessment(data.reply || `At an EMI of ${formatCurrency(Math.round(emi), countryCode)}/mo, this loan represents ${Math.round((emi / (profile?.income || 15000)) * 100)}% of your income. Ensure starting salary covers this.`);
     } catch {
-      setAiAssessment(`At an EMI of ${formatCurrency(emi, countryCode)} per month, this loan will represent about ${Math.round((emi / (profile?.income || 15000)) * 100)}% of your current income. Ensure your expected post-graduation salary covers this comfortably.`);
+      setAiAssessment(`At an EMI of ${formatCurrency(Math.round(emi), countryCode)} per month, this loan will represent about ${Math.round((emi / (profile?.income || 15000)) * 100)}% of your current income. Ensure your expected post-graduation salary covers this comfortably.`);
     } finally {
       setLoadingAi(false);
     }

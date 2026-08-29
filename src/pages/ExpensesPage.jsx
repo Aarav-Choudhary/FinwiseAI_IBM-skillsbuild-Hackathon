@@ -15,7 +15,13 @@ const CATEGORY_COLORS = {
   Other: "#9966FF",
 };
 
-export default function ExpensesPage({ profile, expenses = [], setExpenses }) {
+export default function ExpensesPage({
+  profile,
+  expenses = [],
+  setExpenses,
+  onAddExpense,
+  onDeleteExpense,
+}) {
   const countryCode = profile?.country || "IN";
 
   const [category, setCategory] = useState("Food");
@@ -25,7 +31,7 @@ export default function ExpensesPage({ profile, expenses = [], setExpenses }) {
   const [aiSummary, setAiSummary] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
 
-  const handleAddExpense = (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault();
     if (!amount || Number(amount) <= 0) return;
 
@@ -33,17 +39,26 @@ export default function ExpensesPage({ profile, expenses = [], setExpenses }) {
       id: Date.now().toString(),
       category,
       amount: Number(amount),
-      date,
+      date: date || new Date().toISOString().split("T")[0],
       note,
     };
 
-    setExpenses([newExpense, ...expenses]);
+    if (onAddExpense) {
+      await onAddExpense(newExpense);
+    } else if (setExpenses) {
+      setExpenses([newExpense, ...expenses]);
+    }
+
     setAmount("");
     setNote("");
   };
 
-  const handleDeleteExpense = (id) => {
-    setExpenses(expenses.filter((e) => e.id !== id));
+  const handleDeleteExpense = async (id) => {
+    if (onDeleteExpense) {
+      await onDeleteExpense(id);
+    } else if (setExpenses) {
+      setExpenses(expenses.filter((e) => e.id !== id));
+    }
   };
 
   // Group by category for pie chart
@@ -66,12 +81,19 @@ export default function ExpensesPage({ profile, expenses = [], setExpenses }) {
         body: JSON.stringify({
           message: `Analyze these student expenses: Total spent is ${formatCurrency(totalSpent, countryCode)}. Top category is ${topCat}. Give 2 actionable tips to reduce spending.`,
           systemPrompt: "You are an expense analyst for students. Give a 2-sentence summary and 2 tips.",
+          studentContext: {
+            currencySymbol: profile?.countryData?.symbol || "₹",
+            income: profile?.income || 15000,
+            countryName: profile?.countryData?.name || "India",
+          },
         }),
       });
+      if (!res.ok) throw new Error("Expense audit API unavailable");
       const data = await res.json();
-      setAiSummary(data.reply || "Review your top categories weekly to curb impulse buying.");
+      setAiSummary(data.reply || `Your highest spending category is ${topCat}. Track daily micro-purchases to save 15–20% each month.`);
     } catch {
-      setAiSummary("You are spending most on food and transport this month. Try preparing meals at home to cut costs by 20%.");
+      const topCat = categoryData.sort((a, b) => b.value - a.value)[0]?.name || "Food";
+      setAiSummary(`Your highest spending is on ${topCat} (${formatCurrency(categoryData[0]?.value || 0, countryCode)}). Plan meals and set a weekly cap to save 15%.`);
     } finally {
       setLoadingAi(false);
     }
@@ -118,7 +140,7 @@ export default function ExpensesPage({ profile, expenses = [], setExpenses }) {
             </div>
 
             <div>
-              <label className="block text-xs text-textSecondary mb-1">Amount ({profile?.countryData?.symbol})</label>
+              <label className="block text-xs text-textSecondary mb-1">Amount ({profile?.countryData?.symbol || "₹"})</label>
               <input
                 type="number"
                 required

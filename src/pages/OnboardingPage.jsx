@@ -46,14 +46,21 @@ export default function OnboardingPage({ user, setProfile }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `Generate a brief personalized welcome message (2 sentences) for student ${name} in ${selectedCountry.name} studying ${course} at ${university} with monthly income of ${selectedCountry.symbol}${income}. Mention their goal of: ${selectedGoals.join(", ")}.`,
+          message: `Generate a brief personalized welcome message (2 sentences) for student ${name || "Student"} in ${selectedCountry.name} studying ${course || "General"} at ${university || "University"} with monthly income of ${selectedCountry.symbol}${income || 15000}. Mention their goal of: ${selectedGoals.join(", ")}.`,
           systemPrompt: `You are FinBot, an encouraging financial advisor for college students in ${selectedCountry.name}. Give concise, inspiring financial welcome advice in ${selectedCountry.symbol}.`,
+          studentContext: {
+            currencySymbol: selectedCountry.symbol || "₹",
+            income: Number(income) || 15000,
+            countryName: selectedCountry.name || "India",
+            course: course || "Student",
+          },
         }),
       });
+      if (!res.ok) throw new Error("Welcome API unavailable");
       const data = await res.json();
-      setAiWelcomeTip(data.reply || `Welcome ${name}! We're thrilled to help you master your finances in ${selectedCountry.name}.`);
+      setAiWelcomeTip(data.reply || `Welcome ${name || "Student"}! We're thrilled to help you master your finances in ${selectedCountry.name}.`);
     } catch {
-      setAiWelcomeTip(`Welcome ${name}! We're thrilled to help you navigate your finances in ${selectedCountry.name} and reach your goals.`);
+      setAiWelcomeTip(`Welcome ${name || "Student"}! We're thrilled to help you navigate your finances in ${selectedCountry.name} and reach your goals of ${(selectedGoals || []).join(", ") || "financial growth"}.`);
     } finally {
       setLoadingAi(false);
     }
@@ -63,7 +70,7 @@ export default function OnboardingPage({ user, setProfile }) {
     const profileData = {
       country: countryCode,
       countryData: selectedCountry,
-      name,
+      name: name || "Student",
       university,
       course,
       year,
@@ -73,14 +80,11 @@ export default function OnboardingPage({ user, setProfile }) {
       onboarded: true,
     };
 
-    if (user?.uid) {
-      // Race against a 3-second timeout so a hanging Firestore write
-      // (e.g. placeholder Firebase credentials that never reject) never
-      // blocks navigation to the dashboard.
-      const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
-      await Promise.race([saveProfile(user.uid, profileData), timeout]);
+    const activeUid = user?.uid || "guest_user";
+    await saveProfile(activeUid, profileData);
+    if (setProfile) {
+      setProfile(profileData);
     }
-    setProfile(profileData);
     navigate("/dashboard");
   }
 

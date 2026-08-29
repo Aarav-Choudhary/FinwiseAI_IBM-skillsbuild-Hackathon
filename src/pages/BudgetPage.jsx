@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { PiggyBank, Sparkles, Download, Plus, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { PiggyBank, Sparkles, Download, Plus, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "../lib/countries";
 import { exportToPDF } from "../lib/pdfExport";
 
@@ -7,9 +7,11 @@ export default function BudgetPage({ profile, budget, setBudget }) {
   const countryCode = profile?.country || "IN";
   const symbol = profile?.countryData?.symbol || "₹";
 
-  const [incomeSources, setIncomeSources] = useState([
-    { id: "1", label: "Monthly Allowance", amount: profile?.income || 15000 },
-  ]);
+  const [incomeSources, setIncomeSources] = useState(
+    budget?.incomeSources || [
+      { id: "1", label: "Monthly Allowance", amount: profile?.income || 15000 },
+    ]
+  );
 
   const [newLabel, setNewLabel] = useState("");
   const [newAmount, setNewAmount] = useState("");
@@ -25,21 +27,55 @@ export default function BudgetPage({ profile, budget, setBudget }) {
   const [aiSuggestion, setAiSuggestion] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
 
+  // Sync if budget prop updates from storage
+  useEffect(() => {
+    if (budget?.incomeSources && budget.incomeSources.length > 0) {
+      setIncomeSources(budget.incomeSources);
+    }
+    if (budget?.allocations) {
+      setAllocations(budget.allocations);
+    }
+  }, [budget]);
+
   const totalIncome = incomeSources.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  const persistBudgetChanges = (updatedSources, updatedAllocations) => {
+    const total = updatedSources.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const updated = {
+      ...budget,
+      total,
+      incomeSources: updatedSources,
+      allocations: updatedAllocations,
+    };
+    if (setBudget) {
+      setBudget(updated);
+    }
+  };
 
   const handleAddSource = (e) => {
     e.preventDefault();
     if (!newLabel || !newAmount) return;
-    setIncomeSources([
+    const updated = [
       ...incomeSources,
       { id: Date.now().toString(), label: newLabel, amount: Number(newAmount) },
-    ]);
+    ];
+    setIncomeSources(updated);
+    persistBudgetChanges(updated, allocations);
     setNewLabel("");
     setNewAmount("");
   };
 
+  const handleDeleteSource = (id) => {
+    if (incomeSources.length <= 1) return; // Keep at least one source
+    const updated = incomeSources.filter((s) => s.id !== id);
+    setIncomeSources(updated);
+    persistBudgetChanges(updated, allocations);
+  };
+
   const handleSliderChange = (cat, value) => {
-    setAllocations((prev) => ({ ...prev, [cat]: Number(value) }));
+    const updated = { ...allocations, [cat]: Number(value) };
+    setAllocations(updated);
+    persistBudgetChanges(incomeSources, updated);
   };
 
   const handleGetAiBudget = async () => {
@@ -49,12 +85,18 @@ export default function BudgetPage({ profile, budget, setBudget }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `Recommend an optimal student monthly budget split for total income ${formatCurrency(totalIncome, countryCode)} in ${profile?.countryData?.name}.`,
+          message: `Recommend an optimal student monthly budget split for total income ${formatCurrency(totalIncome, countryCode)} in ${profile?.countryData?.name || "India"}.`,
           systemPrompt: "You are a financial planner for college students. Give a 2-sentence breakdown using the 50/30/20 rule.",
+          studentContext: {
+            currencySymbol: profile?.countryData?.symbol || "₹",
+            income: totalIncome,
+            countryName: profile?.countryData?.name || "India",
+          },
         }),
       });
+      if (!res.ok) throw new Error("Budget suggestion API unavailable");
       const data = await res.json();
-      setAiSuggestion(data.reply || "We recommend allocating 50% for Needs, 30% for Wants, and 20% for Savings.");
+      setAiSuggestion(data.reply || `Allocate 50% (${formatCurrency(totalIncome * 0.5, countryCode)}) for Needs, 30% (${formatCurrency(totalIncome * 0.3, countryCode)}) for Wants, and 20% (${formatCurrency(totalIncome * 0.2, countryCode)}) for Savings.`);
     } catch {
       setAiSuggestion(`For an income of ${formatCurrency(totalIncome, countryCode)}, aim to keep core essentials under ${formatCurrency(totalIncome * 0.5, countryCode)} and save at least ${formatCurrency(totalIncome * 0.2, countryCode)} monthly.`);
     } finally {
@@ -97,8 +139,18 @@ export default function BudgetPage({ profile, budget, setBudget }) {
           <div className="space-y-2">
             {incomeSources.map((src) => (
               <div key={src.id} className="p-3 rounded-xl bg-surface border border-border flex justify-between items-center text-xs">
-                <span className="text-textPrimary font-medium">{src.label}</span>
-                <span className="font-bold text-accent">{formatCurrency(src.amount, countryCode)}</span>
+                <div>
+                  <span className="text-textPrimary font-medium">{src.label}</span>
+                  <span className="block font-bold text-accent">{formatCurrency(src.amount, countryCode)}</span>
+                </div>
+                {incomeSources.length > 1 && (
+                  <button
+                    onClick={() => handleDeleteSource(src.id)}
+                    className="p-1 rounded text-textSecondary hover:text-danger hover:bg-danger/10 transition-colors"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

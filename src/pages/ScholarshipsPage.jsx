@@ -53,14 +53,21 @@ export default function ScholarshipsPage({ profile }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `Match scholarships for student: studying ${profile?.course || "General"} at ${profile?.university || "University"} in ${profile?.countryData?.name}. Provide 2 practical application tips.`,
+          message: `Match scholarships for student: studying ${profile?.course || "General"} at ${profile?.university || "University"} in ${profile?.countryData?.name || "India"}. Provide 2 practical application tips.`,
           systemPrompt: "You are a scholarship advisor. Give 2 concise tips on winning scholarships.",
+          studentContext: {
+            currencySymbol: profile?.countryData?.symbol || "₹",
+            income: profile?.income || 15000,
+            countryName: profile?.countryData?.name || "India",
+            course: profile?.course || "General",
+          },
         }),
       });
+      if (!res.ok) throw new Error("Scholarship API unavailable");
       const data = await res.json();
-      setAiMatchingTip(data.reply || "Submit applications at least 2 weeks before the deadline to avoid portal crashes.");
+      setAiMatchingTip(data.reply || "Submit applications at least 2 weeks before the deadline to maximize your review score.");
     } catch {
-      setAiMatchingTip("Highlight your community involvement and align your essay with the scholarship foundation's core mission statement.");
+      setAiMatchingTip("Highlight your coursework and extracurricular achievements, and align your essay directly with the scholarship foundation's mission.");
     } finally {
       setLoadingAi(false);
     }

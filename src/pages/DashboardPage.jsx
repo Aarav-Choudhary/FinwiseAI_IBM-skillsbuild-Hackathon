@@ -33,14 +33,20 @@ export default function DashboardPage({ profile, expenses = [], budget }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile, expenses, budget }),
       });
+      if (!res.ok) throw new Error("Health score API unavailable");
       const data = await res.json();
-      setHealthScore(data.score || 75);
+      setHealthScore(data.score || 78);
       setHealthGrade(data.grade || "B");
       setAiTip(data.summary || "Your budget is looking healthy!");
     } catch {
-      setHealthScore(78);
-      setHealthGrade("B");
-      setAiTip("Keep your non-essential expenses under 30% of total income to stay on track.");
+      const savingsRate = totalIncome > 0 ? Math.max(0, (totalIncome - totalSpent) / totalIncome) : 0;
+      const score = Math.round(Math.min(100, Math.max(35, (savingsRate * 50) + (totalSpent <= totalBudget ? 30 : 10) + 20)));
+      const grade = score >= 80 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
+      setHealthScore(score);
+      setHealthGrade(grade);
+      setAiTip(savingsRate > 0.15
+        ? "Excellent job! You are maintaining a healthy savings buffer this month."
+        : "Keep your non-essential expenses under 30% of total income to stay on track.");
     } finally {
       setLoadingAi(false);
     }

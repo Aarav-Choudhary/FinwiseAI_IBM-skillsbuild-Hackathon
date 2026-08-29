@@ -2,8 +2,8 @@
  * FinWise AI — Express backend
  *
  * Endpoints:
- *   POST /api/finbot        — IBM watsonx.ai Granite chat (FinBot)
- *   POST /api/health-score  — IBM AI Financial Health Score (0-100)
+ *   POST /api/finbot        — Groq / IBM watsonx.ai Granite chat (FinBot)
+ *   POST /api/health-score  — AI Financial Health Score (0-100)
  *   POST /api/advise        — legacy compatibility stub
  *   GET  /api/health        — health check
  */
@@ -50,8 +50,8 @@ const WATSONX_URL        = process.env.WATSONX_URL        || "https://us-south.m
 const WATSONX_API_KEY    = process.env.WATSONX_API_KEY    || "";
 const WATSONX_PROJECT_ID = process.env.WATSONX_PROJECT_ID || "";
 
-let ibmAccessToken    = null;
-let ibmTokenExpiry    = 0;
+let ibmAccessToken = null;
+let ibmTokenExpiry = 0;
 
 async function getIBMToken() {
   if (ibmAccessToken && Date.now() < ibmTokenExpiry) return ibmAccessToken;
@@ -85,7 +85,7 @@ async function getIBMToken() {
 
 async function callGranite(systemPrompt, userMessage, maxTokens = 800) {
   const token = await getIBMToken();
-  if (!token) return null; // will fall back to stub
+  if (!token || !WATSONX_PROJECT_ID) return null;
 
   const payload = JSON.stringify({
     model_id: "ibm/granite-13b-chat-v2",
@@ -130,11 +130,12 @@ async function callGranite(systemPrompt, userMessage, maxTokens = 800) {
   });
 }
 
-async function callGroq(systemPrompt, userMessage, maxTokens = 800) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
+/* ─────────────────────────────────────────────────────────── */
+/*  Groq / Grok API helper                                     */
+/* ─────────────────────────────────────────────────────────── */
+function makeGroqSingleRequest(apiKey, model, systemPrompt, userMessage, maxTokens = 800) {
   const payload = JSON.stringify({
-    model: "openai/gpt-oss-120b",
+    model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage }
@@ -149,7 +150,7 @@ async function callGroq(systemPrompt, userMessage, maxTokens = 800) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${apiKey.trim()}`,
         "Content-Length": Buffer.byteLength(payload)
       }
     };
@@ -170,13 +171,33 @@ async function callGroq(systemPrompt, userMessage, maxTokens = 800) {
   });
 }
 
+async function callGroq(systemPrompt, userMessage, maxTokens = 800) {
+  const apiKey = (process.env.GROQ_API_KEY || process.env.GROK_API_KEY || "").trim();
+  if (!apiKey) return null;
+
+  // Try the exact model from the original codebase, then robust fallback models
+  const models = [
+    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768"
+  ];
+
+  for (const model of models) {
+    const res = await makeGroqSingleRequest(apiKey, model, systemPrompt, userMessage, maxTokens);
+    if (res) return res;
+  }
+
+  return null;
+}
+
 async function getGroundedExplanation(systemPrompt, userMessage, maxTokens = 800) {
   return await callGroq(systemPrompt, userMessage, maxTokens);
 }
 
 /* ─────────────────────────────────────────────────────────── */
 /*  POST /api/finbot                                           */
-/*  Main FinBot chat endpoint — IBM Granite with student ctx  */
+/*  Main FinBot chat endpoint                                  */
 /* ─────────────────────────────────────────────────────────── */
 const FINBOT_STUB_RESPONSES = [
   "That's a great question! Based on your budget, I'd suggest reviewing your top spending categories first. Students often find the most savings in food and entertainment expenses.",
@@ -209,6 +230,14 @@ Keep responses under 200 words.`;
 
     if (groqResponse) {
       return res.json({ reply: groqResponse, model: "openai/gpt-oss-120b", _real: true });
+    }
+
+    // Fallback if IBM watsonx is configured
+    if (WATSONX_API_KEY && WATSONX_PROJECT_ID) {
+      const graniteResponse = await callGranite(contextPrompt, message, 600);
+      if (graniteResponse) {
+        return res.json({ reply: graniteResponse, model: "ibm/granite-13b-chat-v2", _real: true });
+      }
     }
 
     // Fallback stub
@@ -347,7 +376,7 @@ app.get("/", (_req, res) => {
         <h3>Available API Endpoints:</h3>
         <ul>
           <li><code>GET /api/health</code> — <a href="/api/health">Check Health JSON</a></li>
-          <li><code>POST /api/finbot</code> — IBM watsonx Granite Chat</li>
+          <li><code>POST /api/finbot</code> — Groq / IBM watsonx Granite Chat</li>
           <li><code>POST /api/health-score</code> — AI Financial Health Score (0-100)</li>
         </ul>
         <p>👉 To access the full UI web application, open <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
@@ -364,9 +393,9 @@ app.get("/api/health", (_req, res) => {
     status: "ok",
     timestamp: new Date().toISOString(),
     ibm_configured: !!(WATSONX_API_KEY && WATSONX_PROJECT_ID),
+    groq_configured: !!process.env.GROQ_API_KEY,
   });
 });
-
 
 /* ─────────────────────────────────────────────────────────── */
 /*  SPA Catch-all (must be LAST, after all /api routes)       */
@@ -388,14 +417,13 @@ const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
   console.log(`\n🚀 FinWise AI API on http://localhost:${PORT}`);
-  console.log(`   POST /api/finbot        — FinBot (IBM watsonx Granite)`);
+  console.log(`   POST /api/finbot        — FinBot (Groq / IBM watsonx Granite)`);
   console.log(`   POST /api/health-score  — AI Financial Health Score`);
   console.log(`   POST /api/advise        — legacy compatibility`);
   console.log(`   GET  /api/health        — health check`);
-  if (!WATSONX_API_KEY) {
-    console.log(`\n⚠️  IBM API key not set — running in demo mode`);
-    console.log(`   Set WATSONX_API_KEY and WATSONX_PROJECT_ID in .env\n`);
+  if (!process.env.GROQ_API_KEY && !WATSONX_API_KEY) {
+    console.log(`\n⚠️  No API key set in .env — running in demo mode`);
   } else {
-    console.log(`\n✅ IBM watsonx.ai connected (${WATSONX_URL})\n`);
+    console.log(`\n✅ Connected AI: ${process.env.GROQ_API_KEY ? "Groq (" + (process.env.GROQ_API_KEY.slice(0, 8)) + "...)" : "IBM watsonx"}\n`);
   }
 });

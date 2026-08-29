@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, ArrowRight, Mail, Lock, LogIn, AlertCircle } from "lucide-react";
-import { signInWithGoogle, signInWithEmail, registerWithEmail, getProfile } from "../lib/firebase";
+import {
+  signInWithGoogle,
+  signInWithEmail,
+  registerWithEmail,
+  getProfile,
+  setDemoUserSession,
+} from "../lib/firebase";
 
 export default function AuthPage({ setUser, setProfile }) {
   const [isRegister, setIsRegister] = useState(false);
@@ -13,11 +19,12 @@ export default function AuthPage({ setUser, setProfile }) {
   const navigate = useNavigate();
 
   async function handlePostAuth(userObj) {
-    setUser(userObj);
+    const savedUser = setDemoUserSession(userObj);
+    setUser(savedUser);
     try {
-      const existingProfile = await getProfile(userObj.uid);
+      const existingProfile = await getProfile(savedUser.uid);
       if (existingProfile && existingProfile.onboarded) {
-        setProfile(existingProfile);
+        if (setProfile) setProfile(existingProfile);
         navigate("/dashboard");
       } else {
         navigate("/onboarding");
