@@ -161,55 +161,55 @@ Student Context: Income: ${currencySymbol}${profile?.income || 0}, Course: ${pro
   const topLoans = getLoansForCountry(countryCode).slice(0, 2);
 
   return (
-    <div className="h-[calc(100vh-65px)] flex flex-col md:flex-row overflow-hidden">
+    <div className="h-full flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden bg-bg">
       {/* ── Left Chat Panel ──────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col h-full border-r border-border bg-bg">
-        {/* Chat Messages List */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4">
+      <div className="flex-1 min-w-0 flex flex-col h-full min-h-0 border-r border-border bg-bg overflow-hidden">
+        {/* Chat Messages List (Scrollable Area) */}
+        <div className="flex-1 min-h-0 p-4 md:p-6 overflow-y-auto space-y-4 scroll-smooth">
           {messages.map((msg, index) => (
             <ChatBubble key={index} message={msg} />
           ))}
           {loading && (
-            <div className="flex items-center gap-2 text-xs text-textSecondary p-2">
+            <div className="flex items-center gap-2 text-xs text-textSecondary p-2 bg-surface/50 rounded-xl border border-border/50 w-fit animate-pulse">
               <Sparkles size={14} className="animate-spin text-primary" />
-              <span>FinBot is analyzing your request...</span>
+              <span>FinBot is analyzing your finances...</span>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggested Prompt Chips */}
-        <div className="px-4 py-2 border-t border-border/40 overflow-x-auto flex gap-2 no-scrollbar">
+        {/* Suggested Prompt Chips (Fixed Above Input) */}
+        <div className="px-4 py-2 border-t border-border/40 overflow-x-auto flex gap-2 no-scrollbar bg-surface/30 shrink-0">
           {SUGGESTED_PROMPTS.map((prompt, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(prompt)}
-              className="text-xs bg-surface border border-border px-3 py-1.5 rounded-full text-textSecondary hover:text-textPrimary hover:border-primary/50 whitespace-nowrap transition-colors"
+              className="text-xs bg-surface border border-border px-3 py-1.5 rounded-full text-textSecondary hover:text-textPrimary hover:border-primary/50 whitespace-nowrap transition-all shadow-sm"
             >
               {prompt}
             </button>
           ))}
         </div>
 
-        {/* Input Form */}
+        {/* Input Form (Fixed at Bottom) */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             handleSend();
           }}
-          className="p-4 border-t border-border bg-surface flex items-center gap-2"
+          className="p-4 border-t border-border bg-surface flex items-center gap-2 shrink-0"
         >
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={`Ask FinBot anything about your ${currencySymbol} budget or loans...`}
-            className="input-field flex-1"
+            className="input-field flex-1 text-xs sm:text-sm py-2.5"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="btn-primary p-3 rounded-xl flex items-center justify-center disabled:opacity-50"
+            className="btn-primary p-2.5 sm:p-3 rounded-xl flex items-center justify-center disabled:opacity-50 shadow-md shadow-primary/20 shrink-0"
           >
             <Send size={16} />
           </button>
@@ -217,7 +217,7 @@ Student Context: Income: ${currencySymbol}${profile?.income || 0}, Course: ${pro
       </div>
 
       {/* ── Right Dynamic Context Panel ──────────────────── */}
-      <div className="w-72 p-4 md:p-5 bg-surface border-t md:border-t-0 border-border overflow-y-auto space-y-6 hidden md:block flex-shrink-0">
+      <div className="w-72 p-4 md:p-5 bg-surface border-t md:border-t-0 border-border overflow-y-auto space-y-6 hidden lg:block flex-shrink-0 h-full min-h-0">
         <div>
           <h3 className="text-xs font-semibold text-textSecondary uppercase tracking-wider mb-3">Student Context</h3>
           <div className="glass p-4 rounded-xl space-y-2 text-xs">
