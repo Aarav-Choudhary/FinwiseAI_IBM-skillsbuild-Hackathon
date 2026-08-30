@@ -5,7 +5,6 @@ import {
   Sparkles,
   AlertCircle,
   Info,
-  Download,
   Search,
   Filter,
   CheckCircle2,
@@ -13,7 +12,6 @@ import {
 } from "lucide-react";
 import LoanCard from "../components/LoanCard";
 import { getLoansForCountry, formatCurrency } from "../lib/countries";
-import { exportToPDF } from "../lib/pdfExport";
 
 export default function LoansPage({ profile }) {
   const countryCode = profile?.country || "IN";
@@ -250,7 +248,7 @@ Loan amount: ${formatCurrency(principal, countryCode)}, Rate: ${rate}%, Tenure: 
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" id="loans-report">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Title */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -264,19 +262,6 @@ Loan amount: ${formatCurrency(principal, countryCode)}, Rate: ${rate}%, Tenure: 
             </span>
           </p>
         </div>
-
-        <button
-          onClick={() =>
-            exportToPDF("loans-report", "Student-Loan-Plan", {
-              title: "Student Loan Repayment Plan",
-              studentName: profile?.name,
-            })
-          }
-          className="btn-ghost flex items-center gap-2 text-xs"
-        >
-          <Download size={14} />
-          <span>Export Loan Summary</span>
-        </button>
       </div>
 
       {/* EMI Calculator + AI Assessment (Aligned equal height boxes with clean scrolling) */}

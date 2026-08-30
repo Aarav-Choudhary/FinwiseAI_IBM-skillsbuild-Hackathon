@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { PiggyBank, Sparkles, Download, Plus, Trash2, Edit2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { PiggyBank, Sparkles, Plus, Trash2, Edit2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "../lib/countries";
-import { exportToPDF } from "../lib/pdfExport";
 
 export default function BudgetPage({ profile, budget, setBudget }) {
   const countryCode = profile?.country || "IN";
@@ -124,7 +123,7 @@ export default function BudgetPage({ profile, budget, setBudget }) {
   const totalAllocatedPct = allocations.Needs + allocations.Wants + allocations.Savings;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" id="budget-report">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Title */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -133,14 +132,6 @@ export default function BudgetPage({ profile, budget, setBudget }) {
             Set income streams, allocate 50/30/20 budget targets, and project savings
           </p>
         </div>
-
-        <button
-          onClick={() => exportToPDF("budget-report", "Budget-Plan", { title: "Monthly Student Budget Plan", studentName: profile?.name })}
-          className="btn-ghost flex items-center gap-2 text-xs"
-        >
-          <Download size={14} />
-          <span>Export Budget PDF</span>
-        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
