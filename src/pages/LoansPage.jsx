@@ -35,7 +35,7 @@ export default function LoansPage({ profile }) {
   const [principal, setPrincipal] = useState(250000);
   const [rate, setRate] = useState(8.15);
   const [tenureMonths, setTenureMonths] = useState(60);
-  const [aiAssessment, setAiAssessment] = useState("");
+  const [aiAssessment, setAiAssessment] = useState(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
@@ -200,51 +200,64 @@ export default function LoansPage({ profile }) {
 
   const handleAssessLoan = async () => {
     setLoadingAi(true);
+    const income = profile?.income || 15000;
+    const emiRatio = Math.round((emi / income) * 100);
+    const sym = profile?.countryData?.symbol || "₹";
+
     try {
       const res = await fetch("/api/finbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `Assess student loan affordability:
-Loan amount: ${formatCurrency(principal, countryCode)}, Rate: ${rate}%, Tenure: ${tenureMonths} months. Monthly EMI: ${formatCurrency(
-            Math.round(emi),
-            countryCode
-          )}. Student monthly income: ${formatCurrency(
-            profile?.income || 0,
-            countryCode
-          )}. Student studying ${profile?.course || "Engineering"} at ${
-            profile?.university || "University"
-          }. Recommend whether PM Vidyalaxmi or CSIS subsidy applies.`,
-          systemPrompt:
-            "You are a student loan financial advisor. Give 2-3 concise bullet points with actionable financial advice and government subsidy recommendations (like PM Vidyalaxmi / CSIS). DO NOT output markdown tables, pipe symbols (|), or repeat loan stats. Use bullet points only.",
+          message: `Student loan affordability check:\n- Loan: ${sym}${principal.toLocaleString()} at ${rate}% for ${tenureMonths} months\n- Monthly EMI: ${sym}${Math.round(emi).toLocaleString()}\n- Student monthly income/stipend: ${sym}${income.toLocaleString()}\n- EMI-to-income ratio: ${emiRatio}%\n- Course: ${profile?.course || "Engineering"} | Country: ${profile?.countryData?.name || "India"}\n\nAnswer ONLY: (1) Is this loan affordable? (2) What is the verdict — Affordable / Tight / Unaffordable? (3) Give 2-3 specific next steps or subsidy options for this student. No generic budget advice.`,
+          systemPrompt: `You are a student loan affordability expert. Respond ONLY as a valid JSON object with this exact structure and no other text:\n{\n  "verdict": "Affordable" | "Tight" | "Unaffordable",\n  "verdictReason": "1 sentence explaining the verdict based on EMI vs income ratio",\n  "emiRatio": ${emiRatio},\n  "tips": ["specific tip 1", "specific tip 2", "specific tip 3"]\n}\nDO NOT output anything outside the JSON object. No markdown, no extra text.`,
           studentContext: {
-            currencySymbol: profile?.countryData?.symbol || "₹",
-            income: profile?.income || 15000,
+            currencySymbol: sym,
+            income,
             countryName: profile?.countryData?.name || "India",
           },
         }),
       });
-      if (!res.ok) throw new Error("Loan assessment API unavailable");
+      if (!res.ok) throw new Error("API error");
       const data = await res.json();
-      setAiAssessment(
-        data.reply ||
-          `• At an EMI of ${formatCurrency(
-            Math.round(emi),
-            countryCode
-          )}/mo, this loan represents ${Math.round(
-            (emi / (profile?.income || 15000)) * 100
-          )}% of your monthly cash flow.\n• Apply for the PM Vidyalaxmi or Vidya Lakshmi CSIS subsidy for up to 100% interest subvention during college.`
-      );
+      // Try to parse structured JSON from reply
+      try {
+        const match = (data.reply || "").match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          setAiAssessment({ ...parsed, emiRatio });
+          return;
+        }
+      } catch (_) {}
+      // Fallback: build verdict from ratio
+      setAiAssessment(buildFallback(emiRatio, Math.round(emi), sym, income));
     } catch {
-      setAiAssessment(
-        `• At an EMI of ${formatCurrency(
-          Math.round(emi),
-          countryCode
-        )}/month, ensure expected starting salary comfortably exceeds 4x your EMI.\n• Eligible students should explore PM Vidyalaxmi or CSIS scheme to reduce interest.`
-      );
+      setAiAssessment(buildFallback(emiRatio, Math.round(emi), sym, income));
     } finally {
       setLoadingAi(false);
     }
+  };
+
+  const buildFallback = (emiRatio, emiAmt, sym, income) => {
+    const verdict = emiRatio <= 30 ? "Affordable" : emiRatio <= 55 ? "Tight" : "Unaffordable";
+    const verdictReason =
+      verdict === "Affordable"
+        ? `Your EMI is ${emiRatio}% of income — well within the safe 30% threshold, leaving room for living expenses and savings.`
+        : verdict === "Tight"
+        ? `Your EMI is ${emiRatio}% of income — above the 30% safe limit. This loan is manageable only with strict spending discipline.`
+        : `Your EMI is ${emiRatio}% of income — this exceeds your income sustainably. Consider a longer tenure, co-borrower, or a government subsidy scheme.`;
+    return {
+      verdict,
+      verdictReason,
+      emiRatio,
+      tips: [
+        `Your EMI (${sym}${emiAmt.toLocaleString()}/mo) is ${emiRatio}% of your income (${sym}${income.toLocaleString()}/mo).`,
+        verdict === "Unaffordable"
+          ? "Extend the repayment tenure or add a co-borrower/guarantor to reduce EMI burden."
+          : "Keep total monthly debt obligations below 40% of income for financial stability.",
+        "Check PM Vidyalaxmi / CSIS subsidy — eligible students get 100% interest subvention during the course period.",
+      ],
+    };
   };
 
   return (
@@ -381,22 +394,53 @@ Loan amount: ${formatCurrency(principal, countryCode)}, Rate: ${rate}%, Tenure: 
           </div>
         </div>
 
-        {/* AI Assessment Panel */}
+        {/* AI Affordability Verdict Panel */}
         <div className="glass p-5 rounded-2xl border border-border flex flex-col justify-between space-y-3 h-[360px]">
           <div className="flex justify-between items-center shrink-0">
             <h2 className="text-sm font-semibold text-textPrimary flex items-center gap-2">
-              <Sparkles size={16} className="text-primary" /> AI Financial Risk
+              <Sparkles size={16} className="text-primary" /> Loan Affordability Check
             </h2>
             <span className="badge badge-primary">Grok AI</span>
           </div>
 
           {aiAssessment ? (
-            <div className="p-3 rounded-xl bg-primary/10 border border-primary/30 text-xs flex-1 overflow-y-auto max-h-[220px] space-y-1 pr-1.5">
-              <span className="font-semibold text-primary block text-[11px] mb-1">
-                Affordability Advice:
-              </span>
-              <div className="space-y-1">
-                {cleanFormattedAdvice(aiAssessment)}
+            <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto pr-0.5">
+              {/* Verdict Badge */}
+              <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 ${
+                aiAssessment.verdict === "Affordable"
+                  ? "bg-accent/15 border-accent/40"
+                  : aiAssessment.verdict === "Tight"
+                  ? "bg-warning/15 border-warning/40"
+                  : "bg-danger/15 border-danger/40"
+              }`}>
+                <span className={`text-xl font-black ${
+                  aiAssessment.verdict === "Affordable" ? "text-accent"
+                  : aiAssessment.verdict === "Tight" ? "text-warning"
+                  : "text-danger"
+                }`}>
+                  {aiAssessment.verdict === "Affordable" ? "✅" : aiAssessment.verdict === "Tight" ? "⚠️" : "🚫"}
+                </span>
+                <div>
+                  <p className={`font-bold text-sm ${
+                    aiAssessment.verdict === "Affordable" ? "text-accent"
+                    : aiAssessment.verdict === "Tight" ? "text-warning"
+                    : "text-danger"
+                  }`}>{aiAssessment.verdict}</p>
+                  <p className="text-[10px] text-textSecondary">EMI is {aiAssessment.emiRatio}% of your monthly income</p>
+                </div>
+              </div>
+
+              {/* Verdict Reason */}
+              <p className="text-[11px] text-textPrimary/90 leading-relaxed px-1">{aiAssessment.verdictReason}</p>
+
+              {/* Action Tips */}
+              <div className="space-y-1.5">
+                {(aiAssessment.tips || []).map((tip, i) => (
+                  <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-surface/70 border border-border/60 text-[10.5px] text-textPrimary/90">
+                    <span className="w-4 h-4 rounded-full bg-primary/20 text-primary font-bold text-[9px] flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                    <p className="leading-snug">{tip}</p>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (

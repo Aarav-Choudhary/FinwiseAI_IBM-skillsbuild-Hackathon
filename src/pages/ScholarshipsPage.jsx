@@ -213,38 +213,60 @@ export default function ScholarshipsPage({ profile }) {
     });
   };
 
+  const [aiMatchData, setAiMatchData] = useState(null);
+
   const handleAiMatching = async () => {
     setLoadingAi(true);
     try {
-      const res = await fetch("/api/finbot", {
+      const res = await fetch("/api/match-scholarships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: `Recommend the top 3 latest scholarships for a student studying ${
-            profile?.course || "Computer Science / Engineering"
-          } at ${profile?.university || "University"} in ${
-            profile?.countryData?.name || "India"
-          }. Include active 2026 deadlines and eligibility tips.`,
-          systemPrompt:
-            "You are a scholarship matching advisor. Provide 3 specific scholarship names with active 2026/2027 deadlines and 2 actionable application tips. DO NOT use markdown tables or pipe symbols (|). Use clean concise bullet points only.",
-          studentContext: {
-            currencySymbol: profile?.countryData?.symbol || "₹",
-            income: profile?.income || 15000,
-            countryName: profile?.countryData?.name || "India",
-            course: profile?.course || "General",
-          },
+          country: profile?.countryData?.name || "India",
+          countryCode,
+          course: profile?.course || "Computer Science / Engineering",
+          university: profile?.university || "University",
+          income: profile?.income || 15000,
+          currencySymbol: profile?.countryData?.symbol || "₹",
         }),
       });
-      if (!res.ok) throw new Error("Scholarship API unavailable");
+      if (!res.ok) throw new Error("Scholarship match API unavailable");
       const data = await res.json();
-      setAiMatchingTip(
-        data.reply ||
-          "• Reliance Foundation Undergraduate Scholarship: Grants up to ₹2,00,000 for regular degree students.\n• INSPIRE Scholarship for Higher Education (SHE): ₹80,000/year for science and tech students.\n• Apply at least 15 days before the deadline."
-      );
+      setAiMatchData(data);
     } catch {
-      setAiMatchingTip(
-        "• Apply for Government Central Sector (NSP) and Reliance Foundation scholarships.\n• Submit applications early and align your personal statement directly with the scholarship guidelines."
-      );
+      setAiMatchData({
+        bestScholarships: [
+          {
+            name: "Reliance Foundation Undergraduate Scholarship",
+            provider: "Reliance Foundation",
+            amount: "₹2,00,000",
+            deadline: "2026-10-15",
+            whyBest: `Specifically awards up to ₹2 Lakhs for undergraduate degree students in ${profile?.course || "Engineering"}, combining financial support with leadership mentorship.`,
+            link: "https://www.scholarships.reliancefoundation.org/",
+          },
+          {
+            name: "Central Sector Scheme of University Scholarships (NSP)",
+            provider: "Ministry of Education (Govt of India)",
+            amount: "₹20,000 / yr",
+            deadline: "2026-12-31",
+            whyBest: "Direct Benefit Transfer (DBT) directly into your bank account with simple merit-based board percentile criteria.",
+            link: "https://scholarships.gov.in/",
+          },
+        ],
+        howToApplySteps: [
+          "1. Register on the official portal with your Aadhaar, student email, and phone number.",
+          "2. Complete student profile details (College roll number, NIRF status, income bracket).",
+          "3. Upload scanned marksheets, current year bonafide certificate, and parental income affidavit.",
+          "4. Submit your application online and notify your college scholarship nodal officer for institute verification.",
+        ],
+        requiredDocuments: [
+          "Class 10 & 12 Academic Marksheets",
+          "Family Income Certificate / ITR",
+          "College Bonafide Student Certificate",
+          "Bank Account Passbook (Aadhaar linked)",
+          "College ID Card & Admission Fee Receipt",
+        ],
+      });
     } finally {
       setLoadingAi(false);
     }
@@ -272,7 +294,7 @@ export default function ScholarshipsPage({ profile }) {
           className="btn-primary flex items-center gap-2 text-xs py-2.5 px-4 shadow-lg shadow-primary/20"
         >
           <Sparkles size={14} className={loadingAi ? "animate-spin" : ""} />
-          <span>{loadingAi ? "Searching with Grok..." : "Grok AI Scholarship Match"}</span>
+          <span>{loadingAi ? "Analyzing Best Matches..." : "Grok AI: Find Best & How to Apply"}</span>
         </button>
       </div>
 
@@ -284,23 +306,111 @@ export default function ScholarshipsPage({ profile }) {
         </div>
       )}
 
-      {/* AI Matching Banner (Scrollable and formatted) */}
-      {aiMatchingTip && (
-        <div className="glass p-4 rounded-2xl border border-primary/30 text-xs text-textPrimary leading-relaxed space-y-2 animate-fade-in bg-primary/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 font-bold text-primary">
-              <Sparkles size={14} />
-              <span>Grok AI Tailored Recommendations:</span>
+      {/* Comprehensive AI Best Match & Application Guide Panel */}
+      {aiMatchData && (
+        <div className="glass p-5 rounded-2xl border border-primary/40 text-xs space-y-4 animate-fade-in bg-gradient-to-b from-primary/10 via-surface/60 to-surface/80">
+          <div className="flex items-center justify-between border-b border-border/60 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-primary" />
+              <h3 className="font-bold text-textPrimary text-sm">
+                Grok AI: Best Matching Scholarships for {profile?.course || "Your Degree"}
+              </h3>
             </div>
             <button
-              onClick={() => setAiMatchingTip("")}
-              className="text-textSecondary hover:text-textPrimary text-xs px-1.5 py-0.5 rounded hover:bg-surface"
+              onClick={() => setAiMatchData(null)}
+              className="text-textSecondary hover:text-textPrimary text-xs px-2 py-1 rounded-lg hover:bg-surface border border-border/60"
             >
-              ✕
+              ✕ Close Guide
             </button>
           </div>
-          <div className="max-h-48 overflow-y-auto pr-1.5 space-y-1">
-            {cleanFormattedAdvice(aiMatchingTip)}
+
+          {/* Section 1: Top Recommended Scholarships */}
+          {aiMatchData.bestScholarships && aiMatchData.bestScholarships.length > 0 && (
+            <div className="space-y-2.5">
+              <span className="text-[11px] font-bold text-accent uppercase tracking-wider block">
+                ⭐ Top Recommended Opportunities:
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {aiMatchData.bestScholarships.map((rec, rIdx) => (
+                  <div
+                    key={rIdx}
+                    className="p-3.5 rounded-xl bg-surface/90 border border-border/90 hover:border-primary/50 transition-all flex flex-col justify-between space-y-2.5 shadow-sm"
+                  >
+                    <div>
+                      <div className="flex justify-between items-start gap-2 mb-1">
+                        <h4 className="font-semibold text-textPrimary text-xs line-clamp-1" title={rec.name}>
+                          {rec.name}
+                        </h4>
+                        <span className="text-[10px] font-bold text-accent shrink-0">
+                          {rec.amount}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-textSecondary mb-2">{rec.provider}</p>
+
+                      <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-[10.5px] text-textPrimary/90 leading-snug">
+                        <span className="font-bold text-primary block text-[10px] mb-0.5">
+                          🎯 Why it&apos;s best for you:
+                        </span>
+                        {rec.whyBest}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-border/50 text-[10px]">
+                      <span className="text-warning font-medium">Due: {rec.deadline}</span>
+                      {rec.link && (
+                        <a
+                          href={rec.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-primary py-1 px-2.5 rounded-lg text-[10px] flex items-center gap-1 font-medium"
+                        >
+                          <span>Apply Portal</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Section 2: How to Apply Roadmap & Documents */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-border/60">
+            {/* Step-by-step Roadmap */}
+            <div className="md:col-span-2 space-y-2">
+              <span className="text-[11px] font-bold text-primary uppercase tracking-wider block">
+                📝 Step-by-Step How to Apply:
+              </span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {(aiMatchData.howToApplySteps || []).map((step, sIdx) => (
+                  <div
+                    key={sIdx}
+                    className="p-2.5 rounded-xl bg-surface/70 border border-border/60 flex items-start gap-2 text-[11px] leading-relaxed text-textPrimary"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-primary/20 text-primary font-bold text-[9px] flex items-center justify-center shrink-0 mt-0.5">
+                      {sIdx + 1}
+                    </span>
+                    <p className="flex-1">{step.replace(/^\d+\.\s*/, "")}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Required Documents Checklist */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-warning uppercase tracking-wider block">
+                📋 Mandatory Documents:
+              </span>
+              <div className="p-3 rounded-xl bg-surface/70 border border-border/60 space-y-1.5 max-h-48 overflow-y-auto">
+                {(aiMatchData.requiredDocuments || []).map((docItem, dIdx) => (
+                  <div key={dIdx} className="flex items-center gap-2 text-[10.5px] text-textSecondary">
+                    <CheckCircle2 size={12} className="text-accent shrink-0" />
+                    <span className="text-textPrimary/90 truncate" title={docItem}>{docItem}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -616,6 +616,109 @@ Return ONLY a valid JSON array of objects with this EXACT structure (no other ma
 });
 
 /* ─────────────────────────────────────────────────────────── */
+/*  POST /api/match-scholarships                               */
+/*  Detailed Best Scholarships + How to Apply Guide           */
+/* ─────────────────────────────────────────────────────────── */
+app.post("/api/match-scholarships", async (req, res) => {
+  const {
+    country = "India",
+    countryCode = "IN",
+    course = "Computer Science & Engineering",
+    university = "University",
+    income = 15000,
+    currencySymbol = "₹",
+  } = req.body || {};
+
+  const systemPrompt = `You are a premier university scholarship advisor.
+Evaluate this student profile:
+- Country: ${country} (${countryCode})
+- Course: ${course}
+- University: ${university}
+- Monthly Student Income/Allowance: ${currencySymbol}${income}
+
+Recommend the top 3 best matching scholarships for this specific degree and country, along with a concrete step-by-step "How to Apply" roadmap and required documents.
+
+Return ONLY a valid JSON object in this EXACT structure (no other markdown or extra text):
+{
+  "bestScholarships": [
+    {
+      "name": "Official Scholarship Name",
+      "provider": "Foundation or Government Body",
+      "amount": "${currencySymbol}50,000 / yr",
+      "deadline": "2026-10-31",
+      "whyBest": "1-2 sentences explaining why this is the highest-probability, best-fitting scholarship for a ${course} student.",
+      "link": "https://official-portal-url"
+    }
+  ],
+  "howToApplySteps": [
+    "Step 1: Register on the official portal...",
+    "Step 2: Collect mandatory documents...",
+    "Step 3: Submit application with personal statement..."
+  ],
+  "requiredDocuments": [
+    "Class 10th & 12th Academic Transcripts",
+    "Valid Family Income Certificate (below threshold)",
+    "College Bonafide Student Certificate",
+    "Bank Account Details (Aadhaar/Direct Deposit linked)"
+  ]
+}`;
+
+  const userMessage = `Generate the best matching scholarships and step-by-step application instructions for a ${course} student in ${country}.`;
+
+  try {
+    const response = await callGroq(systemPrompt, userMessage, 1200);
+    if (response) {
+      const match = response.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        return res.json({ ...parsed, _real: true });
+      }
+    }
+    res.json({
+      bestScholarships: [
+        {
+          name: "Reliance Foundation Undergraduate Scholarship",
+          provider: "Reliance Foundation",
+          amount: `${currencySymbol}2,00,000`,
+          deadline: "2026-10-15",
+          whyBest: `Specifically awards up to ₹2 Lakhs for undergraduate degree students in ${course}, combining financial grant with leadership workshops.`,
+          link: "https://www.scholarships.reliancefoundation.org/",
+        },
+        {
+          name: "Central Sector Scheme (NSP)",
+          provider: "Ministry of Education",
+          amount: `${currencySymbol}20,000 / yr`,
+          deadline: "2026-12-31",
+          whyBest: "Direct Benefit Transfer (DBT) scheme with 80,000 fresh awards annually for top board exam scorers.",
+          link: "https://scholarships.gov.in/",
+        },
+      ],
+      howToApplySteps: [
+        "1. Register on the official government/foundation scholarship portal with valid email and phone.",
+        "2. Complete student profile details (enrollment number, university name, category).",
+        "3. Upload attested copies of marksheets, income certificate, and college bonafide letter.",
+        "4. Submit your application and ensure your college nodal officer verifies it before the deadline.",
+      ],
+      requiredDocuments: [
+        "Class 10 & 12 Marksheets",
+        "Family Income Certificate",
+        "College Bonafide Student Certificate",
+        "Bank Passbook (Aadhaar linked)",
+      ],
+      _stub: true,
+    });
+  } catch (err) {
+    console.error("AI scholarship matching error:", err);
+    res.json({
+      bestScholarships: [],
+      howToApplySteps: [],
+      requiredDocuments: [],
+      _stub: true,
+    });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────── */
 /*  GET / (Root API info page)                                 */
 /* ─────────────────────────────────────────────────────────── */
 app.get("/", (_req, res) => {
