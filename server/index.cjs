@@ -263,14 +263,34 @@ app.post("/api/health-score", async (req, res) => {
   const monthlyBudget = budget?.total || income;
 
   const systemPrompt = `You are a financial health analyst for students. 
+Calculate the financial health score based ONLY on two components: Budget Adherence (50 points) and Goal Alignment (50 points).
+
 Respond ONLY with a JSON object in this exact format:
-{"score": <number 0-100>, "grade": "<A|B|C|D>", "summary": "<1 sentence>", "tips": ["<tip1>", "<tip2>", "<tip3>"]}
+{
+  "score": <number 0-100>,
+  "grade": "<A|B|C|D>",
+  "summary": "<1 sentence>",
+  "tips": ["<tip1>", "<tip2>", "<tip3>"],
+  "subScores": {
+    "budget": <number 0-50>,
+    "goals": <number 0-50>
+  },
+  "improvements": [
+    { "points": 5, "action": "<concrete action to do>", "why": "<why it helps your score>" },
+    { "points": 10, "action": "<concrete action to do>", "why": "<why it helps your score>" },
+    { "points": 15, "action": "<concrete action to do>", "why": "<why it helps your score>" }
+  ]
+}
 
 Score guidelines:
-- 80-100 (A): Excellent — savings > 20%, spending < budget, has emergency fund
-- 60-79 (B): Good — savings 10-20%, slight overspend in 1-2 categories  
-- 40-59 (C): Fair — no savings habit, frequently over budget
-- 0-39 (D): Needs help — spending > income, debt reliant`;
+- 80-100 (A): Excellent — spending <= budget, strongly aligns with student goals
+- 60-79 (B): Good — spending close to budget limit, mostly aligns with goals
+- 40-59 (C): Fair — over budget in several categories, poor alignment with goals
+- 0-39 (D): Needs help — severe overspending, does not align with goals
+
+Allocate subScores out of 100 total points:
+- budget: up to 50 points (spending below or equal to monthly budget = higher score)
+- goals: up to 50 points (how well spending aligns with student onboarding goals = higher score)`;
 
   const userMessage = `Student profile:
 Country: ${country}
@@ -280,26 +300,82 @@ Total Spent This Month: ${totalSpent} ${currency}
 Monthly Budget: ${monthlyBudget} ${currency}
 Goals: ${(profile?.goals || []).join(", ") || "Not set"}
 
-Calculate financial health score and give 3 specific tips.`;
+Calculate financial health score, subScores (budget & goals out of 50 each), and give 3 Grok AI improvement tips worth 5, 10, and 15 points.`;
 
   try {
-    const groqResponse = await callGroq(systemPrompt, userMessage, 300);
+    const groqResponse = await callGroq(systemPrompt, userMessage, 500);
 
     if (groqResponse) {
       // Extract JSON from response
       const jsonMatch = groqResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const data = JSON.parse(jsonMatch[0]);
-        return res.json({ ...data, _real: true });
+        try {
+          const data = JSON.parse(jsonMatch[0]);
+          return res.json({ ...data, _real: true });
+        } catch (_) { /* JSON parse failed, fall through to computed fallback */ }
       }
     }
 
-    // Fallback calculation
-    const savingsRate = income > 0 ? Math.max(0, (income - totalSpent) / income) : 0;
-    const score = Math.round(Math.min(100, Math.max(0,
-      (savingsRate * 50) + (totalSpent <= monthlyBudget ? 30 : 10) + 20
-    )));
+    // Computed fallback score when JSON parse failed
+    let budgetSub = 50;
+    if (totalSpent > monthlyBudget) {
+      const overPct = (totalSpent - monthlyBudget) / (monthlyBudget || 1);
+      budgetSub = Math.max(0, Math.round(50 - (overPct * 50)));
+    } else {
+      const remainingPct = monthlyBudget > 0 ? (monthlyBudget - totalSpent) / monthlyBudget : 0;
+      budgetSub = Math.max(20, Math.min(50, Math.round(20 + (remainingPct * 30))));
+    }
+
+    const goalsSub = (profile?.goals && profile.goals.length > 0) ? 38 : 25;
+    const score = Math.round(Math.min(100, Math.max(0, budgetSub + goalsSub)));
     const grade = score >= 80 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D";
+
+    // Ask Groq specifically for 3 personalised improvement tips
+    const tipsPrompt = `You are a financial advisor for students. The student's financial health score is ${score}/100 (grade ${grade}).
+Monthly income: ${income} ${currency}, total spent: ${totalSpent} ${currency}, budget: ${monthlyBudget} ${currency}.
+Goals: ${(profile?.goals || []).join(", ") || "Not set"}.
+
+Return ONLY a JSON array of exactly 3 improvement objects, no other text:
+[
+  { "points": 5,  "action": "<short action>", "why": "<why it helps>" },
+  { "points": 10, "action": "<short action>", "why": "<why it helps>" },
+  { "points": 15, "action": "<short action>", "why": "<why it helps>" }
+]`;
+
+    let improvements = null;
+    const tipsResponse = await callGroq(tipsPrompt, "Give 3 personalised score improvement tips.", 300);
+    if (tipsResponse) {
+      const arrMatch = tipsResponse.match(/\[[\s\S]*\]/);
+      if (arrMatch) {
+        try { improvements = JSON.parse(arrMatch[0]); } catch (_) {}
+      }
+    }
+
+    if (!improvements || !Array.isArray(improvements)) {
+      // Contextual generic tips based on actual data
+      const overBudget = totalSpent > monthlyBudget;
+      improvements = [
+        {
+          points: 5,
+          action: overBudget
+            ? `Reduce daily spending by ${Math.round((totalSpent - monthlyBudget) / 30)} ${currency}`
+            : "Log all micro-purchases to spot spending patterns",
+          why: "Small consistent savings add up to significant budget adherence improvements"
+        },
+        {
+          points: 10,
+          action: profile?.goals?.length > 0
+            ? `Allocate a fixed amount toward "${profile.goals[0]}" each payday`
+            : "Set up an automatic monthly savings transfer of 10% of income",
+          why: "Automating savings ensures goal alignment even in high-spend months"
+        },
+        {
+          points: 15,
+          action: "Keep total monthly spending at or below your budget limit",
+          why: `Spending ${monthlyBudget} ${currency} or less maximises your budget adherence score`
+        }
+      ];
+    }
 
     res.json({
       score,
@@ -307,15 +383,113 @@ Calculate financial health score and give 3 specific tips.`;
       summary: `Your financial health score is ${score}/100 — ${grade === "A" ? "excellent work!" : grade === "B" ? "good progress!" : "room for improvement."}`,
       tips: [
         "Track every expense, even small ones — they add up fast",
-        "Set up automatic savings transfer on your payday",
-        "Review your subscriptions and cancel unused ones",
+        "Save before you spend by allocating 20% on payday",
+        "Review your non-essential categories weekly",
       ],
+      subScores: { budget: budgetSub, goals: goalsSub },
+      improvements,
       _stub: true,
     });
   } catch {
-    res.json({ score: 65, grade: "B", summary: "Good progress on your financial journey!", tips: ["Track expenses daily", "Save before you spend", "Review your budget weekly"], _stub: true });
+    res.json({
+      score: 70,
+      grade: "B",
+      summary: "Good progress on your financial journey!",
+      tips: ["Track expenses daily", "Save before you spend", "Review your budget weekly"],
+      subScores: { budget: 35, goals: 35 },
+      improvements: [
+        { points: 5,  action: "Track all daily micro-purchases",                   why: "Identifies hidden spending leakage" },
+        { points: 10, action: "Automate savings transfers each payday",             why: "Ensures consistent savings rate" },
+        { points: 15, action: "Keep total spending within monthly budget limit",    why: "Directly maximises budget adherence score" }
+      ],
+      _stub: true
+    });
   }
 });
+
+/* ─────────────────────────────────────────────────────────── */
+/*  POST /api/monthly-review                                   */
+/*  IBM AI Monthly Goal Alignment & Review                    */
+/* ─────────────────────────────────────────────────────────── */
+app.post("/api/monthly-review", async (req, res) => {
+  const { profile, expenses, budget } = req.body || {};
+
+  const country     = profile?.country  || "India";
+  const currency    = profile?.currency || "INR";
+  const income      = profile?.income   || 0;
+  const totalSpent  = (expenses || []).reduce((s, e) => s + (e.amount || 0), 0);
+  const monthlyBudget = budget?.total || income;
+  const goals       = profile?.goals || [];
+
+  const categoryTotals = {};
+  (expenses || []).forEach(e => {
+    categoryTotals[e.category] = (categoryTotals[e.category] || 0) + (e.amount || 0);
+  });
+
+  const systemPrompt = `You are a student financial advisor. Compare this student's actual monthly performance vs their onboarding goals.
+Respond ONLY with a JSON object in this exact format:
+{
+  "goalAlignments": [
+    { "goal": "<name of goal>", "status": "<on-track|needs-focus>", "message": "<1-2 sentence comparison explaining why against actual spending data>" }
+  ],
+  "overallVerdict": "<2-sentence encouraging summary of the month>",
+  "nextMonthFocus": "<1 actionable focal point for next month>"
+}`;
+
+  const userMessage = `Student profile:
+Country: ${country}
+Currency: ${currency}
+Monthly Income: ${income} ${currency}
+Monthly Budget Limit: ${monthlyBudget} ${currency}
+Total Spent: ${totalSpent} ${currency}
+Category Breakdown: ${JSON.stringify(categoryTotals)}
+Goals to track: ${JSON.stringify(goals)}
+
+Provide goal alignment feedback based on this data.`;
+
+  try {
+    const groqResponse = await callGroq(systemPrompt, userMessage, 500);
+
+    if (groqResponse) {
+      const jsonMatch = groqResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const data = JSON.parse(jsonMatch[0]);
+        return res.json({ ...data, _real: true });
+      }
+    }
+
+    // Fallback comparison
+    const goalAlignments = goals.map(g => {
+      const isSavingGoal = g.toLowerCase().includes("save") || g.toLowerCase().includes("fund");
+      const savings = income - totalSpent;
+      const status = isSavingGoal ? (savings > 0 ? "on-track" : "needs-focus") : "on-track";
+      const message = isSavingGoal
+        ? `You saved ${savings} ${currency} this month. Keep it up to build your savings habit.`
+        : `Track your day-to-day spending on wants to stay aligned with your goal: "${g}".`;
+      return { goal: g, status, message };
+    });
+
+    res.json({
+      goalAlignments,
+      overallVerdict: `You spent ${totalSpent} ${currency} out of your ${income} ${currency} income. You managed to save ${income - totalSpent} ${currency} this month.`,
+      nextMonthFocus: "Try to keep your non-essential categories below 30% of total spending.",
+      _stub: true
+    });
+  } catch {
+    const goalAlignments = goals.map(g => ({
+      goal: g,
+      status: "on-track",
+      message: "Keep monitoring your expenses to stay aligned."
+    }));
+    res.json({
+      goalAlignments,
+      overallVerdict: "Your overall spending is stable. Continue tracking daily.",
+      nextMonthFocus: "Review your wants categories weekly.",
+      _stub: true
+    });
+  }
+});
+
 
 /* ─────────────────────────────────────────────────────────── */
 /*  POST /api/advise  (legacy compatibility)                   */
@@ -351,6 +525,94 @@ Format: {"explanation": "...", "example": "..."}`;
     ruleCode,
     _stub: true,
   });
+});
+
+/* ─────────────────────────────────────────────────────────── */
+/*  POST /api/discover-scholarships                            */
+/*  Live AI Discovery of Scholarships for country & course    */
+/* ─────────────────────────────────────────────────────────── */
+app.post("/api/discover-scholarships", async (req, res) => {
+  const { country = "India", countryCode = "IN", course = "Engineering", university = "University" } = req.body || {};
+
+  const systemPrompt = `You are a real-time scholarship crawler and advisor.
+Discover 4 real, latest, active scholarships available for students in ${country} (${countryCode}) studying ${course} at ${university}.
+Deadlines MUST be in late 2026 or 2027 (format YYYY-MM-DD).
+Return ONLY a valid JSON array of objects with this EXACT structure (no other markdown or text):
+[
+  {
+    "id": "ai-unique-slug",
+    "name": "Full Official Scholarship Name",
+    "provider": "Official Foundation / Government Ministry",
+    "amount": 50000,
+    "amountPerYear": true,
+    "deadline": "2026-11-30",
+    "type": "Merit",
+    "field": "STEM",
+    "description": "2 sentence clear summary of the grant benefits and coverage.",
+    "eligibility": "Clear concise eligibility criteria.",
+    "link": "https://official-portal-url"
+  }
+]`;
+
+  const userMessage = `Find and return 4 latest verified scholarships for ${country} in 2026/2027.`;
+
+  try {
+    const response = await callGroq(systemPrompt, userMessage, 1000);
+    if (response) {
+      const match = response.match(/\[[\s\S]*\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        return res.json({ scholarships: parsed, _real: true });
+      }
+    }
+    res.json({ scholarships: [], _stub: true });
+  } catch (err) {
+    console.error("AI scholarship discovery error:", err);
+    res.json({ scholarships: [], _stub: true });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────── */
+/*  POST /api/discover-loans                                   */
+/*  Live AI Discovery of Student Loans & Subsidies            */
+/* ─────────────────────────────────────────────────────────── */
+app.post("/api/discover-loans", async (req, res) => {
+  const { country = "India", countryCode = "IN", course = "Engineering", university = "University" } = req.body || {};
+
+  const systemPrompt = `You are an educational financing and banking advisor.
+Discover 3 latest verified student loan schemes or interest subsidy programs for students in ${country} (${countryCode}) studying ${course} at ${university}.
+Return ONLY a valid JSON array of objects with this EXACT structure (no other markdown or text):
+[
+  {
+    "id": "ai-loan-slug",
+    "name": "Full Loan or Subsidy Scheme Name",
+    "provider": "Bank or Government Department",
+    "minAmount": 50000,
+    "maxAmount": 2000000,
+    "interestRate": 8.15,
+    "tenure": 180,
+    "description": "2 sentence clear description of loan features and moratorium terms.",
+    "eligibility": "Eligibility criteria and co-borrower requirements.",
+    "link": "https://official-bank-url"
+  }
+]`;
+
+  const userMessage = `Find and return 3 latest loan schemes and government subsidies for ${country}.`;
+
+  try {
+    const response = await callGroq(systemPrompt, userMessage, 1000);
+    if (response) {
+      const match = response.match(/\[[\s\S]*\]/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        return res.json({ loans: parsed, _real: true });
+      }
+    }
+    res.json({ loans: [], _stub: true });
+  } catch (err) {
+    console.error("AI loan discovery error:", err);
+    res.json({ loans: [], _stub: true });
+  }
 });
 
 /* ─────────────────────────────────────────────────────────── */

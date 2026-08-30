@@ -3,17 +3,18 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, MessageSquare, Receipt, Building2,
   GraduationCap, PiggyBank, LogOut, Menu, X, Sparkles,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Calendar
 } from "lucide-react";
 import { logOut } from "../lib/firebase";
 
 const NAV_ITEMS = [
-  { to: "/dashboard",    icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/chat",         icon: MessageSquare,   label: "FinBot AI" },
-  { to: "/expenses",     icon: Receipt,         label: "Expenses" },
-  { to: "/loans",        icon: Building2,        label: "Loans" },
-  { to: "/scholarships", icon: GraduationCap,   label: "Scholarships" },
-  { to: "/budget",       icon: PiggyBank,        label: "Budget" },
+  { to: "/dashboard",      icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/chat",           icon: MessageSquare,   label: "FinBot AI" },
+  { to: "/expenses",       icon: Receipt,         label: "Expenses" },
+  { to: "/loans",          icon: Building2,        label: "Loans" },
+  { to: "/scholarships",   icon: GraduationCap,   label: "Scholarships" },
+  { to: "/budget",         icon: PiggyBank,        label: "Budget" },
+  { to: "/monthly-report", icon: Calendar,         label: "Monthly Review" },
 ];
 
 export default function Sidebar({ user, profile }) {

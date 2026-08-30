@@ -62,9 +62,9 @@ export default function ChatPage({ user, profile, expenses = [], budget }) {
 
   const defaultGreeting = {
     role: "bot",
-    content: `Hello ${profile?.name || "there"}! I'm FinBot, your IBM watsonx AI financial mentor. I can analyze your spending in ${profile?.countryData?.name || "your region"}, suggest budgets, explain student loans, or match scholarships. What would you like to explore today?`,
+    content: `Hello ${profile?.name || "there"}! I'm FinBot, your Grok AI financial mentor. I can analyze your spending in ${profile?.countryData?.name || "your region"}, suggest budgets, explain student loans, or match scholarships. What would you like to explore today?`,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    model: "ibm/granite-13b-chat-v2",
+    model: "grok-ai",
   };
 
   const [messages, setMessages] = useState([defaultGreeting]);

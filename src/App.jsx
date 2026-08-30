@@ -10,6 +10,7 @@ import ExpensesPage from "./pages/ExpensesPage";
 import LoansPage from "./pages/LoansPage";
 import ScholarshipsPage from "./pages/ScholarshipsPage";
 import BudgetPage from "./pages/BudgetPage";
+import MonthlyReportPage from "./pages/MonthlyReportPage";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 
@@ -363,6 +364,20 @@ export default function App() {
                 profile={profile}
                 budget={budget}
                 setBudget={handleSetBudget}
+              />
+            </AuthenticatedLayout>
+          }
+        />
+
+        {/* Monthly Report */}
+        <Route
+          path="/monthly-report"
+          element={
+            <AuthenticatedLayout title="Month-End Review">
+              <MonthlyReportPage
+                profile={profile}
+                expenses={expenses}
+                budget={budget}
               />
             </AuthenticatedLayout>
           }

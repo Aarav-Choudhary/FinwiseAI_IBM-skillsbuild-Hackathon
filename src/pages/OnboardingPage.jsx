@@ -223,7 +223,7 @@ export default function OnboardingPage({ user, setProfile }) {
                     type="number"
                     value={income}
                     onChange={(e) => setIncome(e.target.value)}
-                    className="input-field pl-8 font-mono text-base"
+                    className="input-field pl-12 font-mono text-base"
                     placeholder="15000"
                   />
                 </div>
@@ -272,7 +272,7 @@ export default function OnboardingPage({ user, setProfile }) {
               <div className="p-4 rounded-xl glass border border-primary/30 text-left space-y-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-primary">
                   <Sparkles size={14} />
-                  <span>IBM Granite First Financial Tip</span>
+                  <span>Grok AI First Financial Tip</span>
                 </div>
                 {loadingAi ? (
                   <div className="space-y-2 py-2">

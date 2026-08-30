@@ -7,6 +7,7 @@ import {
 import HealthScoreGauge from "../components/HealthScoreGauge";
 import AIInsightCard from "../components/AIInsightCard";
 import BudgetRing from "../components/BudgetRing";
+import ScoreBreakdownPanel from "../components/ScoreBreakdownPanel";
 import { formatCurrency, getScholarshipsForCountry, getLoansForCountry } from "../lib/countries";
 
 export default function DashboardPage({ profile, expenses = [], budget }) {
@@ -17,6 +18,9 @@ export default function DashboardPage({ profile, expenses = [], budget }) {
   const [healthGrade, setHealthGrade] = useState("B");
   const [aiTip, setAiTip] = useState("");
   const [loadingAi, setLoadingAi] = useState(false);
+  const [subScores, setSubScores] = useState({ savings: 25, budget: 25, goals: 15 });
+  const [improvements, setImprovements] = useState([]);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   const totalIncome = profile?.income || 15000;
   const totalSpent = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -38,6 +42,8 @@ export default function DashboardPage({ profile, expenses = [], budget }) {
       setHealthScore(data.score || 78);
       setHealthGrade(data.grade || "B");
       setAiTip(data.summary || "Your budget is looking healthy!");
+      setSubScores(data.subScores || { savings: 25, budget: 25, goals: 15 });
+      setImprovements(data.improvements || []);
     } catch {
       const savingsRate = totalIncome > 0 ? Math.max(0, (totalIncome - totalSpent) / totalIncome) : 0;
       const score = Math.round(Math.min(100, Math.max(35, (savingsRate * 50) + (totalSpent <= totalBudget ? 30 : 10) + 20)));
@@ -47,6 +53,16 @@ export default function DashboardPage({ profile, expenses = [], budget }) {
       setAiTip(savingsRate > 0.15
         ? "Excellent job! You are maintaining a healthy savings buffer this month."
         : "Keep your non-essential expenses under 30% of total income to stay on track.");
+
+      const savingsSub = Math.round(Math.min(40, savingsRate * 40));
+      const budgetSub = totalSpent <= totalBudget ? 30 : 10;
+      const goalsSub = 15;
+      setSubScores({ savings: savingsSub, budget: budgetSub, goals: goalsSub });
+      setImprovements([
+        { points: 5, action: "Track micro-expenses daily", why: "Identifies leakage in wants budget category" },
+        { points: 10, action: "Set up automatic monthly savings transfers", why: "Enforces consistent savings rate habit" },
+        { points: 15, action: "Review and cancel unused subscriptions", why: "Reduces core needs expenses directly" }
+      ]);
     } finally {
       setLoadingAi(false);
     }
@@ -78,18 +94,24 @@ export default function DashboardPage({ profile, expenses = [], budget }) {
         </Link>
       </div>
 
-      {/* ── Core Grid: Health Score, Budget, AI Insight ───── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ── Core Grid: Health Score, Budget, AI Insight, Burn Rate ───── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
         {/* Widget 1: AI Health Score */}
-        <div className="glass p-6 rounded-2xl border border-border flex flex-col items-center justify-between">
-          <div className="w-full flex justify-between items-center mb-2">
+        <div className="glass p-6 rounded-2xl border border-border flex flex-col items-center justify-start h-full">
+          <div className="w-full flex justify-between items-center mb-4">
             <span className="text-xs font-semibold text-textSecondary uppercase tracking-wider">AI Financial Health Score</span>
-            <span className="badge badge-primary">IBM Granite</span>
+            <span className="badge badge-primary">Grok AI</span>
           </div>
           <HealthScoreGauge score={healthScore} grade={healthGrade} />
-          <p className="text-[11px] text-textSecondary text-center mt-3">
-            Based on budget adherence, savings, and expense patterns
-          </p>
+          <button
+            onClick={() => setShowBreakdown(!showBreakdown)}
+            className="btn-ghost text-[11px] mt-4 py-1 px-3 flex items-center gap-1 hover:text-primary"
+          >
+            <span>{showBreakdown ? "Hide Details ▲" : "How to Improve ▼"}</span>
+          </button>
+          {showBreakdown && (
+            <ScoreBreakdownPanel subScores={subScores} improvements={improvements} />
+          )}
         </div>
 
         {/* Widget 2: Budget Ring */}
@@ -127,7 +149,70 @@ export default function DashboardPage({ profile, expenses = [], budget }) {
             </Link>
           </div>
         </div>
+
+        {/* Widget 4: Budget Burn Rate Projection */}
+        <div className="glass p-6 rounded-2xl border border-border flex flex-col justify-between">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-semibold text-textSecondary uppercase tracking-wider">Burn Rate & Forecast</span>
+            <span className="badge badge-accent">Live Forecast</span>
+          </div>
+          {(() => {
+            const today = new Date();
+            const currentDay = today.getDate();
+            const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+            const percentElapsed = Math.round((currentDay / daysInMonth) * 100);
+            
+            const dailyBurn = currentDay > 0 ? totalSpent / currentDay : 0;
+            const projectedSpend = Math.round(dailyBurn * daysInMonth);
+            const isOver = projectedSpend > totalBudget;
+            const overAmt = projectedSpend - totalBudget;
+            const spendPercent = totalBudget > 0 ? Math.round((projectedSpend / totalBudget) * 100) : 0;
+            
+            return (
+              <div className="space-y-4 my-auto">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-[10px] text-textSecondary uppercase">Projected Spend</p>
+                    <p className={`text-xl font-bold ${isOver ? 'text-danger' : 'text-accent'}`}>
+                      {formatCurrency(projectedSpend, countryCode)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-textSecondary uppercase">Pace</p>
+                    <p className={`text-xs font-semibold ${isOver ? 'text-danger' : 'text-textPrimary'}`}>
+                      {spendPercent}% of Budget
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-textSecondary">
+                    <span>Month Elapsed: {percentElapsed}%</span>
+                    <span>Day {currentDay} of {daysInMonth}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden border border-border/40">
+                    <div 
+                      className="h-full bg-primary transition-all duration-500" 
+                      style={{ width: `${percentElapsed}%` }}
+                    />
+                  </div>
+                </div>
+
+                {isOver ? (
+                  <div className="p-3 rounded-xl bg-danger/15 border border-danger/30 text-danger text-[11px] leading-snug">
+                    ⚠️ pacing to overspend by <strong>{formatCurrency(overAmt, countryCode)}</strong> by month-end. Consider reducing Want allocations.
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-accent/15 border border-accent/30 text-accent text-[11px] leading-snug">
+                    🟢 Great! Your current burn rate puts you on track to finish within your budget.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
       </div>
+
 
       {/* ── Second Row: Deadlines + Recommended Loans ──────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -96,7 +96,7 @@ export default function AuthPage({ setUser, setProfile }) {
             Take Control of Your Student Finances with AI
           </h1>
           <p className="text-textSecondary text-sm lg:text-base leading-relaxed">
-            Get instant answers to your budget, scholarship, and loan questions powered by IBM watsonx.ai Granite.
+            Get instant answers to your budget, scholarship, and loan questions powered by Grok AI.
           </p>
 
           <div className="space-y-3 pt-4">
@@ -116,7 +116,7 @@ export default function AuthPage({ setUser, setProfile }) {
         </div>
 
         <div className="ibm-badge self-start">
-          Powered by IBM watsonx.ai
+          Powered by Grok AI
         </div>
       </div>
 

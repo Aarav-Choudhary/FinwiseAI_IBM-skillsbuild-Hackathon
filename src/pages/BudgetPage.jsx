@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PiggyBank, Sparkles, Download, Plus, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { PiggyBank, Sparkles, Download, Plus, Trash2, Edit2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "../lib/countries";
 import { exportToPDF } from "../lib/pdfExport";
 
@@ -15,6 +15,10 @@ export default function BudgetPage({ profile, budget, setBudget }) {
 
   const [newLabel, setNewLabel] = useState("");
   const [newAmount, setNewAmount] = useState("");
+
+  const [editingId, setEditingId] = useState(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editAmount, setEditAmount] = useState("");
 
   const [allocations, setAllocations] = useState(
     budget?.allocations || {
@@ -50,6 +54,16 @@ export default function BudgetPage({ profile, budget, setBudget }) {
     if (setBudget) {
       setBudget(updated);
     }
+  };
+
+  const handleSaveEdit = (id) => {
+    if (!editLabel || !editAmount || Number(editAmount) <= 0) return;
+    const updated = incomeSources.map((s) =>
+      s.id === id ? { ...s, label: editLabel, amount: Number(editAmount) } : s
+    );
+    setIncomeSources(updated);
+    persistBudgetChanges(updated, allocations);
+    setEditingId(null);
   };
 
   const handleAddSource = (e) => {
@@ -137,22 +151,84 @@ export default function BudgetPage({ profile, budget, setBudget }) {
           </h2>
 
           <div className="space-y-2">
-            {incomeSources.map((src) => (
-              <div key={src.id} className="p-3 rounded-xl bg-surface border border-border flex justify-between items-center text-xs">
-                <div>
-                  <span className="text-textPrimary font-medium">{src.label}</span>
-                  <span className="block font-bold text-accent">{formatCurrency(src.amount, countryCode)}</span>
+            {incomeSources.map((src) => {
+              if (editingId === src.id) {
+                return (
+                  <div key={src.id} className="p-3 rounded-xl bg-surface border border-primary/40 space-y-2.5 text-xs">
+                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Editing Income Source</p>
+                    <div>
+                      <label className="block text-[10px] text-textSecondary mb-1">Source Name</label>
+                      <input
+                        type="text"
+                        value={editLabel}
+                        onChange={(e) => setEditLabel(e.target.value)}
+                        placeholder="e.g. Monthly Allowance"
+                        className="input-field text-xs w-full py-1.5 px-3"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-textSecondary mb-1">Amount ({symbol})</label>
+                      <input
+                        type="number"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                        placeholder="e.g. 15000"
+                        className="input-field text-xs w-full py-1.5 px-3"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEdit(src.id)}
+                        className="btn-primary flex-1 py-1.5 text-[11px] font-semibold"
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        className="btn-ghost flex-1 py-1.5 text-[11px]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={src.id} className="p-3 rounded-xl bg-surface border border-border flex justify-between items-center text-xs">
+                  <div>
+                    <span className="text-textPrimary font-medium">{src.label}</span>
+                    <span className="block font-bold text-accent">{formatCurrency(src.amount, countryCode)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(src.id);
+                        setEditLabel(src.label);
+                        setEditAmount(src.amount);
+                      }}
+                      className="p-1.5 rounded text-textSecondary hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Edit source"
+                    >
+                      <Edit2 size={13} />
+                    </button>
+                    {incomeSources.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSource(src.id)}
+                        className="p-1.5 rounded text-textSecondary hover:text-danger hover:bg-danger/10 transition-colors"
+                        title="Delete source"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {incomeSources.length > 1 && (
-                  <button
-                    onClick={() => handleDeleteSource(src.id)}
-                    className="p-1 rounded text-textSecondary hover:text-danger hover:bg-danger/10 transition-colors"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <form onSubmit={handleAddSource} className="space-y-2 pt-2 border-t border-border">
@@ -186,13 +262,13 @@ export default function BudgetPage({ profile, budget, setBudget }) {
               className="btn-ghost text-xs flex items-center gap-1.5 py-1 px-3"
             >
               <Sparkles size={14} className="text-primary" />
-              <span>{loadingAi ? "Thinking..." : "IBM 50/30/20 Suggestion"}</span>
+              <span>{loadingAi ? "Thinking..." : "Grok 50/30/20 Suggestion"}</span>
             </button>
           </div>
 
           {aiSuggestion && (
             <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/30 text-xs text-textPrimary leading-relaxed">
-              <span className="font-semibold text-primary block mb-1">IBM watsonx Suggestion:</span>
+              <span className="font-semibold text-primary block mb-1">Grok AI Suggestion:</span>
               {aiSuggestion}
             </div>
           )}

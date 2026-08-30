@@ -33,12 +33,8 @@ export default function AIInsightCard({ tip, loading = false, onRefresh }) {
       )}
 
       <div className="mt-3 flex items-center gap-1.5">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="#4589FF">
-          <rect x="0" y="5" width="24" height="3" />
-          <rect x="3" y="10.5" width="18" height="3" />
-          <rect x="0" y="16" width="24" height="3" />
-        </svg>
-        <span className="text-[10px] text-blue-400/70">IBM watsonx · Granite</span>
+        <Sparkles size={10} className="text-primary" />
+        <span className="text-[10px] text-textSecondary">Grok AI</span>
       </div>
     </div>
   );

@@ -52,13 +52,9 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="ibm-badge hidden sm:inline-flex">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="0" y="5" width="24" height="3" />
-              <rect x="3" y="10.5" width="18" height="3" />
-              <rect x="0" y="16" width="24" height="3" />
-            </svg>
-            IBM watsonx.ai
+          <div className="badge badge-primary hidden sm:inline-flex py-1 px-3">
+            <Sparkles size={12} className="mr-1 text-primary" />
+            Grok AI
           </div>
           <Link to="/auth" className="btn-primary flex items-center gap-2">
             <span>Get Started</span>
@@ -70,7 +66,7 @@ export default function LandingPage() {
       {/* ── Hero Section ───────────────────────────────────── */}
       <section className="px-6 py-20 max-w-6xl mx-auto text-center flex flex-col items-center justify-center flex-1">
         <div className="badge badge-primary mb-6 py-1.5 px-4 text-xs">
-          <Sparkles size={14} className="text-primary" /> Powered by IBM Granite LLM
+          <Sparkles size={14} className="text-primary" /> Powered by Grok AI
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight max-w-4xl leading-tight mb-6">
@@ -119,7 +115,7 @@ export default function LandingPage() {
             </div>
             <h3 className="font-semibold text-lg text-textPrimary">Budget & Expense Analyzer</h3>
             <p className="text-sm text-textSecondary leading-relaxed">
-              Track where your money goes with visual charts. Get instant IBM Granite insights on trimming overspending.
+              Track where your money goes with visual charts. Get instant Grok AI insights on trimming overspending.
             </p>
           </div>
 
@@ -145,46 +141,42 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Testimonials / Trust ──────────────────────────── */}
+      {/* ── Key Facts & Value ──────────────────────────── */}
       <section className="px-6 py-16 border-t border-border/60 max-w-6xl mx-auto w-full">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl font-bold text-textPrimary mb-2">Smart Student Money Management</h2>
+          <p className="text-xs text-textSecondary">Real financial principles powered by Grok AI</p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="glass p-5 rounded-2xl space-y-3">
-            <div className="flex text-warning gap-1">
-              {"★".repeat(5)}
-            </div>
-            <p className="text-xs text-textPrimary/90 italic">
-              "FinBot explained my loan repayment options in simple terms. Saved me from taking a high-interest private loan."
+            <h4 className="text-sm font-bold text-primary">Budget Optimization</h4>
+            <p className="text-xs text-textSecondary leading-relaxed">
+              Over 60% of college students struggle with unexpected monthly expenses. We simplify budget allocations using the proven 50/30/20 rule.
             </p>
-            <p className="text-xs font-semibold text-textSecondary">— Ananya S., CS Student (India)</p>
           </div>
 
           <div className="glass p-5 rounded-2xl space-y-3">
-            <div className="flex text-warning gap-1">
-              {"★".repeat(5)}
-            </div>
-            <p className="text-xs text-textPrimary/90 italic">
-              "The scholarship finder matched me with a $7,500 grant I didn't even know existed. Game changer!"
+            <h4 className="text-sm font-bold text-accent">Avoid Debt Traps</h4>
+            <p className="text-xs text-textSecondary leading-relaxed">
+              Understanding reducing-balance EMI calculations before taking out student loans can save thousands in future interest payments.
             </p>
-            <p className="text-xs font-semibold text-textSecondary">— Marcus T., Biology Major (USA)</p>
           </div>
 
           <div className="glass p-5 rounded-2xl space-y-3">
-            <div className="flex text-warning gap-1">
-              {"★".repeat(5)}
-            </div>
-            <p className="text-xs text-textPrimary/90 italic">
-              "Finally an app that works in GBP and understands UK student loans. The AI expense analysis is spot on."
+            <h4 className="text-sm font-bold text-warning">Unclaimed Grants</h4>
+            <p className="text-xs text-textSecondary leading-relaxed">
+              Millions of dollars in local scholarships go unclaimed every year. Our system pre-filters schemes specific to your country and field of study.
             </p>
-            <p className="text-xs font-semibold text-textSecondary">— Oliver K., Economics (UK)</p>
           </div>
         </div>
       </section>
 
       {/* ── Footer ────────────────────────────────────────── */}
       <footer className="px-6 py-8 border-t border-border text-center text-xs text-textSecondary">
-        <p className="mb-2">FinWise AI — Deployed for IBM SkillsBuild Hackathon 2026</p>
-        <p className="text-[11px] text-textSecondary/60">Powered by IBM watsonx.ai (Granite-13b-chat-v2)</p>
+        <p className="mb-2">FinWise AI — Student Financial Advisory Platform 2026</p>
+        <p className="text-[11px] text-textSecondary/60">Powered by Grok AI</p>
       </footer>
     </div>
   );
 }
+
